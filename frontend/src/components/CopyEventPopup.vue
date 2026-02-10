@@ -96,14 +96,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { CalendarEvent } from '../types'
 
-interface Props {
-  isOpen: boolean
-  sourceEvent: CalendarEvent | null
-  onConfirm: (dates: Date[]) => Promise<void>
-  onCancel: () => void
-}
-
-const props = defineProps<Props>()
+const props = defineProps<{ isOpen: boolean; sourceEvent: CalendarEvent | null }>()
+const emit = defineEmits<{
+  (e: 'confirm', dates: Date[]): void
+  (e: 'cancel'): void
+}>()
 
 const selectedDates = ref<Date[]>([])
 const currentMonth = ref(new Date())
@@ -185,11 +182,10 @@ const nextMonth = () => {
 }
 
 const confirm = async () => {
-  if (selectedDates.length === 0) return
-
+  if (selectedDates.value.length === 0) return
   isLoading.value = true
   try {
-    await props.onConfirm(selectedDates.value)
+    emit('confirm', selectedDates.value)
     reset()
   } finally {
     isLoading.value = false
@@ -198,7 +194,7 @@ const confirm = async () => {
 
 const cancel = () => {
   reset()
-  props.onCancel()
+  emit('cancel')
 }
 
 const reset = () => {

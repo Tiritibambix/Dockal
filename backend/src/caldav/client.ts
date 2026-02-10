@@ -1,5 +1,5 @@
 // Note: xmldom package has been replaced with @xmldom/xmldom for better security and maintenance
-import DAV from '@xmldom/xmldom'
+import * as DAV from 'dav'
 import ICAL from 'ical.js'
 import { CalendarEvent } from '../types.js'
 

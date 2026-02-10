@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { CalendarEvent, CopyEventPayload } from '../types.js'
+import { CalendarEvent, CopyEventPayload } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
