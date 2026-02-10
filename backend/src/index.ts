@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import fastifyJwt from '@fastify/jwt'
-import fastifyAuth from '@fastify/auth'
 import fastifyCors from '@fastify/cors'
 import { CalDAVClient } from './caldav/client.js'
 import { authRoutes } from './routes/auth.js'
@@ -21,7 +20,6 @@ const fastify: FastifyInstance = Fastify({ logger: true })
 
 // Register plugins
 fastify.register(fastifyJwt, { secret: JWT_SECRET })
-fastify.register(fastifyAuth)
 fastify.register(fastifyCors, {
   origin: FRONTEND_URL,
   credentials: true,
