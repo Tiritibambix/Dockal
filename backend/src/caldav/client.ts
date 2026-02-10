@@ -1,4 +1,4 @@
-import DAV from 'dav'
+// Note: The xmldom package is deprecated and contains critical vulnerabilities.\n// We're keeping it for now as it's a transitive dependency of the 'dav' package.\n// TODO: Investigate alternative CalDAV libraries that don't depend on xmldom\nimport DAV from 'dav'
 import ICAL from 'ical.js'
 import { CalendarEvent } from '../types.js'
 
@@ -9,7 +9,7 @@ const {
   createCalendarObject,
   updateCalendarObject,
   deleteCalendarObject,
-} = DAV
+} = DAV as any
 
 export class CalDAVClient {
   private account: any
