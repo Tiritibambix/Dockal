@@ -2,11 +2,9 @@ version: '3.8'
 
 services:
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: tiritibambix/dockal-frontend:latest
     ports:
-      - "5173:80"
+      - "5182:80"          # host 5182 -> container 80 (changed from 5173)
     depends_on:
       - backend
     environment:
@@ -15,11 +13,9 @@ services:
       - dockal
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: tiritibambix/dockal-backend:latest
     ports:
-      - "3000:3000"
+      - "3002:3000"        # host 3002 -> container 3000 (avoid host 3000)
     depends_on:
       - radicale
     environment:
@@ -28,7 +24,7 @@ services:
       - RADICALE_PASSWORD=password
       - JWT_SECRET=your-secret-key-in-prod
       - NODE_ENV=production
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=http://localhost:5182
     networks:
       - dockal
 
