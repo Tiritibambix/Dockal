@@ -1,13 +1,12 @@
-import Fastify from 'fastify'
+import 'dotenv/config'
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import fastifyJwt from '@fastify/jwt'
+import fastifyAuth from '@fastify/auth'
 import fastifyCors from '@fastify/cors'
-import { config } from 'dotenv'
 import { CalDAVClient } from './caldav/client.js'
 import { authRoutes } from './routes/auth.js'
 import { eventsRoutes } from './routes/events.js'
 import { calendarsRoutes } from './routes/calendars.js'
-
-config()
 
 const {
   RADICALE_URL = 'http://localhost:5232',
@@ -18,10 +17,11 @@ const {
   FRONTEND_URL = 'http://localhost:5173',
 } = process.env
 
-const fastify = Fastify({ logger: true })
+const fastify: FastifyInstance = Fastify({ logger: true })
 
 // Register plugins
 fastify.register(fastifyJwt, { secret: JWT_SECRET })
+fastify.register(fastifyAuth)
 fastify.register(fastifyCors, {
   origin: FRONTEND_URL,
   credentials: true,
@@ -35,7 +35,7 @@ const caldavClient = new CalDAVClient(
 )
 
 // JWT auth decorator
-fastify.decorate('authenticate', async function (request, reply) {
+fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify()
   } catch (err) {
@@ -44,12 +44,12 @@ fastify.decorate('authenticate', async function (request, reply) {
 })
 
 // Routes
-fastify.register((f) => authRoutes(f))
-fastify.register((f) => eventsRoutes(f, caldavClient))
-fastify.register((f) => calendarsRoutes(f, caldavClient))
+fastify.register((f: FastifyInstance) => authRoutes(f))
+fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
+fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
 
 // Health check
-fastify.get('/health', (request, reply) => {
+fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
   return reply.send({ status: 'ok' })
 })
 
