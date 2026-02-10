@@ -34,12 +34,11 @@ const caldavClient = new CalDAVClient(
   RADICALE_PASSWORD
 )
 
-// JWT auth decorator
-fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
+fastify.addHook('preHandler', async (request, reply) => {
   try {
     await request.jwtVerify()
   } catch (err) {
-    reply.status(401).send({ error: 'Unauthorized' })
+    reply.code(401).send({ error: 'Unauthorized' })
   }
 })
 

@@ -1,8 +1,11 @@
 import 'fastify';
-import { FastifyRequest } from 'fastify';
 
 declare module 'fastify' {
   interface FastifyInstance {
-    authenticate(this: FastifyInstance, request: FastifyRequest): Promise<void>;
+    jwtVerify: () => Promise<void>;
+  }
+  
+  interface FastifyRequest {
+    jwtVerify: () => Promise<void>;
   }
 }
