@@ -14,7 +14,7 @@
     "fastify": "^5.7.3",
     "@fastify/jwt": "^6.1.0",
     "@fastify/cors": "^8.5.0",
-    "dav": "^1.10.4",
+    "dav": "perry-mitchell/dav",
     "ical.js": "^1.5.0",
     "uuid": "^9.0.1",
     "zod": "^3.22.4"
