@@ -1,29 +1,33 @@
 {
   "name": "dockal-backend",
   "version": "1.0.0",
-  "description": "CalDAV Radicale proxy backend",
-  "main": "dist/index.js",
+  "description": "Backend proxy pour Radicale (CalDAV) avec Fastify",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc --outDir dist",
     "start": "node dist/index.js",
-    "test": "vitest"
+    "test": "vitest run",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "fastify": "^5.7.3",
     "@fastify/jwt": "^6.1.0",
     "@fastify/cors": "^8.5.0",
-    "dav": "perry-mitchell/dav",
+    "dav": "^2.0.0",
     "ical.js": "^1.5.0",
     "uuid": "^9.0.1",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@types/ical.js": "^1.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@types/uuid": "^9.0.7",
     "typescript": "^5.3.3",
     "tsx": "^4.7.0",
-    "vitest": "^1.1.0"
+    "vitest": "^1.1.0",
+    "@types/dav": "^2.0.0"
   }
 }
+
