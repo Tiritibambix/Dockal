@@ -30,6 +30,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
 
   // POST /events
   fastify.post('/events', { onRequest: [fastify.authenticate] }, async (request, reply) => {
+    const query = request.query as Record<string, any>;
     const body = request.body as unknown;
     const event: CalendarEvent = {
       uid: '',
