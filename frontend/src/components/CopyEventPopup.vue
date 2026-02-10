@@ -183,6 +183,7 @@ const nextMonth = () => {
 
 const confirm = async () => {
   if (selectedDates.value.length === 0) return
+
   isLoading.value = true
   try {
     emit('confirm', selectedDates.value)

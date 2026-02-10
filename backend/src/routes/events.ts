@@ -30,46 +30,75 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
   });
 
   // POST /events
-  fastify.post<{ Body: Omit<CalendarEvent, 'uid'> }>('/events', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Body: Omit<CalendarEvent, 'uid'> }>, reply: FastifyReply) => {
-    const body = request.body
-    const newEvent: CalendarEvent = {
-      uid: uuidv4(),
-      title: body.title || '',
-      description: body.description,
-      location: body.location,
-      start: new Date(body.start || new Date()),
-      end: new Date(body.end || new Date()),
-      allDay: body.allDay || false,
-      timezone: body.timezone || 'UTC'
+  fastify.post<{ Body: Omit<CalendarEvent, 'uid'> }>(
+    '/events',
+    { onRequest: [fastify.authenticate] },
+    async (request: FastifyRequest<{ Body: Omit<CalendarEvent, 'uid'> }>, reply: FastifyReply) => {
+      const body = request.body
+      const newEvent: CalendarEvent = {
+        uid: uuidv4(),
+        title: body.title || '',
+        description: body.description,
+        location: body.location,
+        start: new Date(body.start || new Date()),
+        end: new Date(body.end || new Date()),
+        allDay: body.allDay || false,
+        timezone: body.timezone || 'UTC',
+      }
+
+      try {
+        await caldavClient.createEvent(newEvent)
+        return reply.code(201).send(newEvent)
+      } catch (err) {
+        fastify.log.error(err)
+        return reply.status(500).send({ error: 'Failed to create event' })
+      }
     }
-    await caldavClient.createEvent(newEvent)
-    reply.code(201).send(newEvent)
-  });
+  )
 
   // PUT /events/:uid
-  fastify.put<{ Params: { id: string }; Body: CalendarEvent }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string }; Body: CalendarEvent }>, reply: FastifyReply) => {
-    const id = request.params.id as string
-    const body = request.body
-    const event: CalendarEvent = {
-      uid: id,
-      title: body.title || '',
-      description: body.description,
-      location: body.location,
-      start: new Date(body.start || new Date()),
-      end: new Date(body.end || new Date()),
-      allDay: body.allDay || false,
-      timezone: body.timezone || 'UTC'
+  fastify.put<{ Params: { id: string }; Body: CalendarEvent }>(
+    '/events/:id',
+    { onRequest: [fastify.authenticate] },
+    async (request: FastifyRequest<{ Params: { id: string }; Body: CalendarEvent }>, reply: FastifyReply) => {
+      const id = request.params.id as string
+      const body = request.body
+      const event: CalendarEvent = {
+        uid: id,
+        title: body.title || '',
+        description: body.description,
+        location: body.location,
+        start: new Date(body.start || new Date()),
+        end: new Date(body.end || new Date()),
+        allDay: body.allDay || false,
+        timezone: body.timezone || 'UTC',
+      }
+
+      try {
+        await caldavClient.updateEvent(event)
+        return reply.send(event)
+      } catch (err) {
+        fastify.log.error(err)
+        return reply.status(500).send({ error: 'Failed to update event' })
+      }
     }
-    await caldavClient.updateEvent(event)
-    reply.send(event)
-  });
+  )
 
   // DELETE /events/:uid
-  fastify.delete<{ Params: { id: string } }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const id = request.params.id as string
-    await caldavClient.deleteEvent(id)
-    reply.send({ success: true })
-  });
+  fastify.delete<{ Params: { id: string } }>(
+    '/events/:id',
+    { onRequest: [fastify.authenticate] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const id = request.params.id as string
+      try {
+        await caldavClient.deleteEvent(id)
+        return reply.send({ success: true })
+      } catch (err) {
+        fastify.log.error(err)
+        return reply.status(500).send({ error: 'Failed to delete event' })
+      }
+    }
+  )
 
   // 🟦 COPY EVENT FEATURE
   // POST /events/:uid/copy
@@ -116,12 +145,21 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
   );
 
   // GET /events/:uid
-  fastify.get<{ Params: { id: string } }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const id = request.params.id as string
-    const ev = await caldavClient.getEventByUid(id)
-    if (!ev) return reply.status(404).send({ error: 'Event not found' })
-    reply.send(ev)
-  });
+  fastify.get<{ Params: { id: string } }>(
+    '/events/:id',
+    { onRequest: [fastify.authenticate] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const id = request.params.id as string
+      try {
+        const ev = await caldavClient.getEventByUid(id)
+        if (!ev) return reply.status(404).send({ error: 'Event not found' })
+        return reply.send(ev)
+      } catch (err) {
+        fastify.log.error(err)
+        return reply.status(500).send({ error: 'Failed to fetch event' })
+      }
+    }
+  );
 }
 
 /**
