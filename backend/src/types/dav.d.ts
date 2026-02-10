@@ -1,4 +1,4 @@
-declare module 'dav' {
+declare module '@xmldom/xmldom' {
   export interface Account {
     username: string
     password: string
