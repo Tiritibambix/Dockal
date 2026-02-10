@@ -20,7 +20,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
       fastify.log.error(err)
       return reply.status(500).send({ error: 'Failed to fetch events' })
     }
-  )
+  })
 
   // POST /events
   fastify.post('/events', { onRequest: [fastify.authenticate] }, async (request, reply) => {
@@ -36,7 +36,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
       fastify.log.error(err)
       return reply.status(500).send({ error: 'Failed to create event' })
     }
-  )
+  })
 
   // PUT /events/:uid
   fastify.put('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
@@ -50,7 +50,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
       fastify.log.error(err)
       return reply.status(500).send({ error: 'Failed to update event' })
     }
-  )
+  })
 
   // DELETE /events/:uid
   fastify.delete('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
@@ -61,7 +61,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
       fastify.log.error(err)
       return reply.status(500).send({ error: 'Failed to delete event' })
     }
-  )
+  })
 
   // 🟦 COPY EVENT FEATURE
   // POST /events/:uid/copy
@@ -106,6 +106,21 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
       }
     }
   )
+
+  // GET /events/:uid
+  fastify.get('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
+    try {
+      const event = await caldavClient.getEventByUid(request.params.id)
+      if (!event) {
+        return reply.status(404).send({ error: 'Event not found' })
+      }
+
+      return reply.send(event)
+    } catch (err) {
+      fastify.log.error(err)
+      return reply.status(500).send({ error: 'Failed to fetch event' })
+    }
+  })
 }
 
 /**
