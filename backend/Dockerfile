@@ -4,8 +4,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-# install dev + prod deps to run tsc
-RUN npm install
+# install dev + prod deps but do NOT run lifecycle scripts yet (prepare/build)
+RUN npm install --ignore-scripts
 
 COPY . .
 RUN npm run build
