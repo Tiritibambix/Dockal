@@ -9,18 +9,17 @@ RUN npm install
 
 COPY . .
 RUN npm run build
+# remove devDependencies to keep only production deps
+RUN npm prune --production
 
-# runtime stage: install only production deps and copy built artifacts
+# runtime stage: copy built artifacts and production deps from builder
 FROM node:20-alpine AS runtime
 
 WORKDIR /app
-
-COPY package*.json ./
-# install only production deps (safe without package-lock)
-RUN npm install --omit=dev
-
-# copy compiled output
+# copy compiled output and production node_modules from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
 
 EXPOSE 3000
 
