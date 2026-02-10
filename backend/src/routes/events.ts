@@ -1,11 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { RouteGenericInterface } from 'fastify/types/route';
 import { v4 as uuidv4 } from 'uuid';
 import { CalendarEvent, CopyEventPayload, CopyEventResult } from '../types.js';
 import { CalDAVClient } from '../caldav/client.js';
 
 export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClient) {
   // GET /events?from=2026-01-01&to=2026-12-31
-  fastify.get('/events', { onRequest: [fastify.authenticate] }, async (request, reply) => {
+  fastify.get<{ Querystring: { from: string; to: string; calendarId: string } }>('/events', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Querystring: { from: string; to: string; calendarId: string } }>, reply: FastifyReply) => {
     const query = request.query as Record<string, any>;
     if (!query || typeof query.calendarId !== 'string') {
       return reply.code(400).send({ error: 'calendarId is required' });
@@ -29,39 +30,39 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
   });
 
   // POST /events
-  fastify.post('/events', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    const query = request.query as Record<string, any>;
-    const body = request.body as unknown;
+  fastify.post<{ Body: Omit<CalendarEvent, 'uid'> }>('/events', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Body: Omit<CalendarEvent, 'uid'> }>, reply: FastifyReply) => {
+    const query = request.query;
+    const body = request.body;
     const event: CalendarEvent = {
       uid: '',
-      title: (body as any).title || '',
-      start: (body as any).start || new Date(),
-      end: (body as any).end || new Date(),
-      allDay: (body as any).allDay || false,
-      timezone: (body as any).timezone || 'UTC'
+      title: body.title || '',
+      start: body.start || new Date(),
+      end: body.end || new Date(),
+      allDay: body.allDay || false,
+      timezone: body.timezone || 'UTC'
     };
     reply.code(201).send(await createEvent(event));
   });
 
   // PUT /events/:uid
-  fastify.put('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    const params = request.params as Record<string, unknown>;
-    const body = request.body as unknown;
+  fastify.put<{ Params: { id: string }; Body: CalendarEvent }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string }; Body: CalendarEvent }>, reply: FastifyReply) => {
+    const params = request.params;
+    const body = request.body;
     const id = params.id as string;
     const event: CalendarEvent = {
       uid: id,
-      title: (body as any).title || '',
-      start: (body as any).start || new Date(),
-      end: (body as any).end || new Date(),
-      allDay: (body as any).allDay || false,
-      timezone: (body as any).timezone || 'UTC'
+      title: body.title || '',
+      start: body.start || new Date(),
+      end: body.end || new Date(),
+      allDay: body.allDay || false,
+      timezone: body.timezone || 'UTC'
     };
     reply.send(await updateEvent(id, event));
   });
 
   // DELETE /events/:uid
-  fastify.delete('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    const params = request.params as Record<string, unknown>;
+  fastify.delete<{ Params: { id: string } }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const params = request.params;
     const id = params.id as string;
     reply.send(await deleteEvent(id));
   });
@@ -71,7 +72,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
   fastify.post<{ Params: { uid: string }; Body: CopyEventPayload }>(
     '/events/:uid/copy',
     { onRequest: [fastify.authenticate] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Params: { uid: string }; Body: CopyEventPayload }>, reply: FastifyReply) => {
       try {
         const sourceEvent = await caldavClient.getEventByUid(request.params.uid);
         if (!sourceEvent) {
@@ -111,8 +112,8 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
   );
 
   // GET /events/:uid
-  fastify.get('/events/:id', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    const params = request.params as Record<string, unknown>;
+  fastify.get<{ Params: { id: string } }>('/events/:id', { onRequest: [fastify.authenticate] }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const params = request.params;
     const id = params.id as string;
     reply.send(await getEvent(id));
   });
