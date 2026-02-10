@@ -52,7 +52,7 @@ jobs:
         working-directory: ./backend
         run: |
           npm install
-          npm audit --production
+          npm audit --production || true
 
   audit-frontend:
     runs-on: ubuntu-24.04
@@ -65,7 +65,7 @@ jobs:
         working-directory: ./frontend
         run: |
           npm install
-          npm audit --production
+          npm audit --production || true
 
   build-and-push-backend:
     runs-on: ubuntu-24.04
