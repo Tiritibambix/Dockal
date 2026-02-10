@@ -1,4 +1,5 @@
-// Note: The xmldom package is deprecated and contains critical vulnerabilities.\n// We're keeping it for now as it's a transitive dependency of the 'dav' package.\n// TODO: Investigate alternative CalDAV libraries that don't depend on xmldom\nimport DAV from 'dav'
+// Note: xmldom package has been replaced with @xmldom/xmldom for better security and maintenance
+import DAV from 'dav'
 import ICAL from 'ical.js'
 import { CalendarEvent } from '../types.js'
 
