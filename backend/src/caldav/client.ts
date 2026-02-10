@@ -9,7 +9,7 @@ const {
   createCalendarObject,
   updateCalendarObject,
   deleteCalendarObject,
-} = DAV as typeof import('dav')
+} = DAV as any
 
 export class CalDAVClient {
   private account: any
