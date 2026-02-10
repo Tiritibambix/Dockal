@@ -1,4 +1,3 @@
-// Note: xmldom package has been replaced with @xmldom/xmldom for better security and maintenance
 import * as DAV from 'dav'
 import ICAL from 'ical.js'
 import { CalendarEvent } from '../types.js'
@@ -26,11 +25,16 @@ export class CalDAVClient {
 
   async initialize() {
     try {
+      // Create credentials + Basic transport expected by dav.createAccount
+      const creds = new DAV.Credentials({ username: this.username, password: this.password })
+      const xhr = new DAV.transport.Basic(creds)
+
       this.account = await createAccount({
-        serverUrl: this.radicaleUrl,
-        username: this.username,
-        password: this.password,
-        authType: 'basic',
+        server: this.radicaleUrl,
+        xhr,
+        accountType: 'caldav',
+        loadCollections: true,
+        loadObjects: false,
       })
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${err}`)

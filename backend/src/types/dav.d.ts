@@ -1,14 +1,9 @@
 declare module 'dav' {
   export interface Account {
-    username: string
-    password: string
-    serverUrl: string
-  }
-
-  export interface Calendar {
-    url: string
-    ctag?: string
-    displayName?: string
+    username?: string
+    password?: string
+    serverUrl?: string
+    // ...other runtime fields returned by dav
   }
 
   export interface CalendarObject {
@@ -17,43 +12,24 @@ declare module 'dav' {
     etag?: string
   }
 
-  export interface TimeObj {
-    timezone?: string
-    toJSDate(): Date
-    toICALString(): string
-    isDate: boolean
+  export class Credentials {
+    constructor(opts: { username: string; password: string })
   }
 
-  export class Component {
-    constructor(data: any)
-    getFirstSubcomponent(name: string): Component | null
-    getFirstPropertyValue(name: string): any
-    addPropertyWithValue(name: string, value: any): void
-    addSubcomponent(comp: Component): void
-    getFirstProperty(name: string): any
-    addProperty(prop: Property): void
-    toString(): string
+  export namespace transport {
+    export class Basic {
+      constructor(credentials: Credentials)
+    }
   }
 
-  export class Property {
-    static fromString(str: string): Property
-  }
-
-  export class Time {
-    static fromJSDate(date: Date, includeTime?: boolean): TimeObj
-    timezone?: string
-    toJSDate(): Date
-    toICALString(): string
-    isDate: boolean
-  }
-
-  export function parse(icsString: string): any[]
   export function createAccount(options: {
-    serverUrl: string
-    username: string
-    password: string
-    authType?: 'basic' | 'digest'
+    server: string
+    xhr?: any
+    accountType?: string
+    loadCollections?: boolean
+    loadObjects?: boolean
   }): Promise<Account>
+
   export function calendarQuery(options: any): Promise<CalendarObject[]>
   export function fetchCalendarObjects(options: any): Promise<CalendarObject[]>
   export function createCalendarObject(options: any): Promise<void>
