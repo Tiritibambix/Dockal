@@ -17,11 +17,15 @@ declare module 'ical.js' {
 
   export class Property {
     constructor(data: any);
+    static fromString(icsString: string): Property;
   }
 
   export class Time {
     constructor(data: any);
+    timezone: string;
+    isDate: boolean;
     static fromJSDate(date: Date, useUTC?: boolean): Time;
+    toJSDate(): Date;
   }
 
   export function parse(icsString: string): Component;
