@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY package*.json ./
 # install dev + prod deps to run tsc
-RUN npm ci
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -16,8 +16,8 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 COPY package*.json ./
-# install only production deps
-RUN npm ci --omit=dev
+# install only production deps (safe without package-lock)
+RUN npm install --omit=dev
 
 # copy compiled output
 COPY --from=builder /app/dist ./dist
