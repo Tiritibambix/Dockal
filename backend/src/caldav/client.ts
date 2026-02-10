@@ -9,7 +9,7 @@ const {
   createCalendarObject,
   updateCalendarObject,
   deleteCalendarObject,
-} = DAV as any
+} = DAV
 
 export class CalDAVClient {
   private account: any
