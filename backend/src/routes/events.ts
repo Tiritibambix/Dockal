@@ -6,8 +6,7 @@ import { CalDAVClient } from '../caldav/client.js';
 export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClient) {
   // GET /events?from=2026-01-01&to=2026-12-31
   fastify.get('/events', { onRequest: [fastify.authenticate] }, async (request, reply) => {
-    const query = (request.query ?? {}) as Record<string, string | undefined>;
-    const calendarId = query.calendarId;
+    const calendarId = request.query.calendarId;
 
     try {
       const from = new Date(request.query.from);

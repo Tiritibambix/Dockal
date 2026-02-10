@@ -8,5 +8,6 @@ declare module 'fastify' {
   
   interface FastifyRequest {
     jwtVerify: () => Promise<void>;
+    query: Record<string, string | undefined>;
   }
 }

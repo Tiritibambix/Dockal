@@ -11,10 +11,6 @@ declare module 'ical.js' {
     toJCal(): any;
   }
 
-  export class Event {
-    constructor(data: any);
-  }
-
   export class Property {
     constructor(data: any);
     static fromString(icsString: string): Property;
@@ -28,5 +24,5 @@ declare module 'ical.js' {
     toJSDate(): Date;
   }
 
-  export function parse(icsString: string): Component;
+  export function parse(icsString: string | undefined): Component;
 }
