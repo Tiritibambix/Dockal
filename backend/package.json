@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "fastify": "^4.25.0",
-    "@fastify/jwt": "^7.8.0",
+    "@fastify/jwt": "^6.1.0",
     "@fastify/cors": "^8.5.0",
     "dav": "^1.10.5",
     "ical.js": "^1.5.0",

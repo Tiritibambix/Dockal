@@ -8,13 +8,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.3.8",
-    "fullcalendar": "^6.1.10",
+    "vue": "^3.5.28",
+    "@fullcalendar/core": "^6.1.10",
     "@fullcalendar/daygrid": "^6.1.10",
     "@fullcalendar/timegrid": "^6.1.10",
     "@fullcalendar/interaction": "^6.1.10",
-    "@fullcalendar/vue": "^6.1.10",
-    "@fullcalendar/core": "^6.1.10",
+    "@fullcalendar/vue3": "^6.1.10",
+    "fullcalendar": "^6.1.10",
     "ical.js": "^1.5.0",
     "uuid": "^9.0.1",
     "axios": "^1.6.5"
