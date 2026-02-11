@@ -77,27 +77,42 @@ export class CalDAVClient {
           
           console.log(`[CalDAV] Parsing object ${i}`)
           
-          const jcal = ICAL.parse(icsData)
-          const comp = new ICAL.Component(jcal)
-          
-          // Get all VEVENT subcomponents by iterating
-          const vevents: any[] = []
-          const components = (comp as any).components || []
-          for (const subcomp of components) {
-            if (subcomp.name === 'VEVENT') {
-              vevents.push(subcomp)
-            }
-          }
+          // Parse the full ICS and extract events using regex as backup
+          const vEventMatches = icsData.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || []
+          console.log(`[CalDAV] Object ${i} contains ${vEventMatches.length} VEVENT(s) (regex match)`)
 
-          console.log(`[CalDAV] Object ${i} contains ${vevents.length} VEVENT(s)`)
-
-          for (const vevent of vevents) {
-            try {
-              const event = this.parseEvent(vevent as ICAL.Component)
+          // Also try ICAL.Component parsing
+          try {
+            const jcal = ICAL.parse(icsData)
+            const comp = new ICAL.Component(jcal)
+            
+            // Try getFirstSubcomponent first
+            let vevent = comp.getFirstSubcomponent('VEVENT')
+            if (vevent) {
+              const event = this.parseEvent(vevent)
               events.push(event)
-              console.log(`[CalDAV] Parsed event: ${event.title}`)
-            } catch (eventErr) {
-              console.warn(`[CalDAV] Failed to parse VEVENT in object ${i}: ${String(eventErr)}`)
+              console.log(`[CalDAV] Parsed event via getFirstSubcomponent: ${event.title}`)
+            }
+          } catch (icalErr) {
+            console.warn(`[CalDAV] ICAL.Component parsing failed: ${String(icalErr)}`)
+            
+            // Fallback: parse individual VEVENT blocks manually
+            for (const vEventBlock of vEventMatches) {
+              try {
+                // Wrap individual VEVENT in VCALENDAR
+                const wrappedICS = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Dockal//EN\n${vEventBlock}\nEND:VCALENDAR`
+                const jcal = ICAL.parse(wrappedICS)
+                const comp = new ICAL.Component(jcal)
+                const vevent = comp.getFirstSubcomponent('VEVENT')
+                
+                if (vevent) {
+                  const event = this.parseEvent(vevent)
+                  events.push(event)
+                  console.log(`[CalDAV] Parsed event via fallback: ${event.title}`)
+                }
+              } catch (fallbackErr) {
+                console.warn(`[CalDAV] Fallback parsing failed: ${String(fallbackErr)}`)
+              }
             }
           }
         } catch (parseErr) {
