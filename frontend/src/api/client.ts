@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios'
 import { CalendarEvent, CopyEventPayload } from '../types'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_BASE = '/api' // Utilise le proxy nginx
 
 export class APIClient {
   private api: AxiosInstance

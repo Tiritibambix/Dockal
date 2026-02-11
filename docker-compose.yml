@@ -7,8 +7,6 @@ services:
       - "5182:80"
     depends_on:
       - backend
-    environment:
-      - VITE_API_URL=http://<HOST_IP>:3002
     networks:
       - dockal
 
