@@ -16,7 +16,7 @@ export class CalDAVClient {
 
   async initialize() {
     try {
-      fastify.log.info('[CalDAV] Initializing client')
+      console.log('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
       const xhr = new DAV.transport.Basic(creds)
 
@@ -27,7 +27,7 @@ export class CalDAVClient {
         loadCollections: true,
         loadObjects: false,
       })
-      fastify.log.info('[CalDAV] Initialized successfully')
+      console.log('[CalDAV] Initialized successfully')
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
@@ -35,7 +35,7 @@ export class CalDAVClient {
 
   async listCalendars() {
     try {
-      fastify.log.info('[CalDAV] Listing calendars')
+      console.log('[CalDAV] Listing calendars')
       const calendars = await DAV.fetchCalendarObjects({
         account: this.account,
         url: this.calendarUrl,
@@ -48,7 +48,7 @@ export class CalDAVClient {
 
   async getEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
     try {
-      fastify.log.info(`[CalDAV] Getting events from ${from} to ${to}`)
+      console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
       const results = await DAV.fetchCalendarObjects({
         account: this.account,
@@ -68,12 +68,12 @@ export class CalDAVClient {
             events.push(this.parseEvent(vevent))
           }
         } catch (parseErr) {
-          fastify.log.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
+          console.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
           continue
         }
       }
 
-      fastify.log.info(`[CalDAV] Found ${events.length} events`)
+      console.log(`[CalDAV] Found ${events.length} events`)
       return events
     } catch (err) {
       throw new Error(`Failed to fetch events: ${String(err)}`)
@@ -82,7 +82,7 @@ export class CalDAVClient {
 
   async getEventByUid(uid: string): Promise<CalendarEvent | null> {
     try {
-      fastify.log.info(`[CalDAV] Getting event by UID: ${uid}`)
+      console.log(`[CalDAV] Getting event by UID: ${uid}`)
       const objs = await DAV.fetchCalendarObjects({
         account: this.account,
         url: this.calendarUrl,
@@ -108,7 +108,7 @@ export class CalDAVClient {
 
   async createEvent(event: CalendarEvent): Promise<void> {
     try {
-      fastify.log.info(`[CalDAV] Creating event: ${event.uid}`)
+      console.log(`[CalDAV] Creating event: ${event.uid}`)
       const ics = this.eventToICS(event)
       await DAV.createCalendarObject({
         account: this.account,
@@ -116,7 +116,7 @@ export class CalDAVClient {
         data: ics,
         contentType: 'text/calendar',
       })
-      fastify.log.info(`[CalDAV] Event created: ${event.uid}`)
+      console.log(`[CalDAV] Event created: ${event.uid}`)
     } catch (err) {
       throw new Error(`Failed to create event: ${String(err)}`)
     }
@@ -124,7 +124,7 @@ export class CalDAVClient {
 
   async updateEvent(event: CalendarEvent): Promise<void> {
     try {
-      fastify.log.info(`[CalDAV] Updating event: ${event.uid}`)
+      console.log(`[CalDAV] Updating event: ${event.uid}`)
       const ics = this.eventToICS(event)
       await DAV.updateCalendarObject({
         account: this.account,
@@ -132,7 +132,7 @@ export class CalDAVClient {
         data: ics,
         contentType: 'text/calendar',
       })
-      fastify.log.info(`[CalDAV] Event updated: ${event.uid}`)
+      console.log(`[CalDAV] Event updated: ${event.uid}`)
     } catch (err) {
       throw new Error(`Failed to update event: ${String(err)}`)
     }
@@ -140,12 +140,12 @@ export class CalDAVClient {
 
   async deleteEvent(uid: string): Promise<void> {
     try {
-      fastify.log.info(`[CalDAV] Deleting event: ${uid}`)
+      console.log(`[CalDAV] Deleting event: ${uid}`)
       await DAV.deleteCalendarObject({
         account: this.account,
         url: `${this.calendarUrl}${uid}.ics`,
       })
-      fastify.log.info(`[CalDAV] Event deleted: ${uid}`)
+      console.log(`[CalDAV] Event deleted: ${uid}`)
     } catch (err) {
       throw new Error(`Failed to delete event: ${String(err)}`)
     }
