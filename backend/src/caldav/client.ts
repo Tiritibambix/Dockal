@@ -5,7 +5,6 @@ import { CalendarEvent } from '../types.js'
 export class CalDAVClient {
   private account: any
   private calendar: any
-  private xhr: any
 
   constructor(
     private radicaleUrl: string,
@@ -17,21 +16,14 @@ export class CalDAVClient {
     try {
       console.log('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
-      this.xhr = new DAV.transport.Basic(creds)
+      const xhr = new DAV.transport.Basic(creds)
 
       this.account = await DAV.createAccount({
         server: this.radicaleUrl,
-        xhr: this.xhr,
+        xhr,
         accountType: 'caldav',
         loadCollections: true,
-        loadObjects: false,
-      })
-
-      // Sync account to get calendars
-      await DAV.syncCaldavAccount({
-        account: this.account,
-        loadCollections: true,
-        loadObjects: false,
+        loadObjects: true,
       })
 
       const calendars = this.account.calendars || []
@@ -60,13 +52,6 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
-      // Sync calendar to load objects
-      await DAV.syncCaldavAccount({
-        account: this.account,
-        loadCollections: true,
-        loadObjects: true,
-      })
-
       const events: CalendarEvent[] = []
       const objects = this.calendar.objects || []
 
@@ -78,7 +63,11 @@ export class CalDAVClient {
             const vevent = comp.getFirstSubcomponent('VEVENT')
 
             if (vevent) {
-              events.push(this.parseEvent(vevent))
+              const event = this.parseEvent(vevent)
+              // Filter by date range if needed
+              if (event.start >= from && event.start <= to) {
+                events.push(event)
+              }
             }
           }
         } catch (parseErr) {
@@ -99,13 +88,6 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      // Sync to get all objects
-      await DAV.syncCaldavAccount({
-        account: this.account,
-        loadCollections: true,
-        loadObjects: true,
-      })
-
       const objects = this.calendar.objects || []
 
       for (const obj of objects) {
