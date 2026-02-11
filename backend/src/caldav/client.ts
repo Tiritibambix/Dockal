@@ -2,15 +2,6 @@ import * as DAV from 'dav'
 import ICAL from 'ical.js'
 import { CalendarEvent } from '../types.js'
 
-const {
-  createAccount,
-  calendarQuery,
-  fetchCalendarObjects,
-  createCalendarObject,
-  updateCalendarObject,
-  deleteCalendarObject,
-} = DAV
-
 export class CalDAVClient {
   private account: any
   private calendarUrl: string
@@ -20,136 +11,151 @@ export class CalDAVClient {
     private username: string,
     private password: string,
   ) {
-    this.calendarUrl = `${radicaleUrl}/user/${username}/calendar.ics/`
+    this.calendarUrl = `${radicaleUrl}/${username}/calendar.ics/`
   }
 
   async initialize() {
     try {
-      // Create credentials + Basic transport expected by dav.createAccount
+      fastify.log.info('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
       const xhr = new DAV.transport.Basic(creds)
 
-      this.account = await createAccount({
+      this.account = await DAV.createAccount({
         server: this.radicaleUrl,
         xhr,
         accountType: 'caldav',
         loadCollections: true,
         loadObjects: false,
       })
+      fastify.log.info('[CalDAV] Initialized successfully')
     } catch (err) {
-      throw new Error(`CalDAV initialization failed: ${err}`)
+      throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
   }
 
   async listCalendars() {
     try {
-      const calendars = await fetchCalendarObjects({
+      fastify.log.info('[CalDAV] Listing calendars')
+      const calendars = await DAV.fetchCalendarObjects({
         account: this.account,
         url: this.calendarUrl,
       })
       return calendars
     } catch (err) {
-      throw new Error(`Failed to list calendars: ${err}`)
+      throw new Error(`Failed to list calendars: ${String(err)}`)
     }
   }
 
   async getEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
     try {
-      const filters = [
-        ['VEVENT', [['DTSTART', { '&': 'T' }, from.toISOString()]]]
-      ]
-
-      const results = await calendarQuery({
+      fastify.log.info(`[CalDAV] Getting events from ${from} to ${to}`)
+      
+      const results = await DAV.fetchCalendarObjects({
         account: this.account,
         url: this.calendarUrl,
-        filters,
-        depth: 1,
       })
 
       const events: CalendarEvent[] = []
 
       for (const obj of results) {
-        const icsData = obj.data
-        const jcal = ICAL.parse(icsData)
-        const comp = new ICAL.Component(jcal)
-        const vevent = comp.getFirstSubcomponent('VEVENT')
+        try {
+          const icsData = obj.data
+          const jcal = ICAL.parse(icsData)
+          const comp = new ICAL.Component(jcal)
+          const vevent = comp.getFirstSubcomponent('VEVENT')
 
-        if (vevent) {
-          events.push(this.parseEvent(vevent))
+          if (vevent) {
+            events.push(this.parseEvent(vevent))
+          }
+        } catch (parseErr) {
+          fastify.log.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
+          continue
         }
       }
 
+      fastify.log.info(`[CalDAV] Found ${events.length} events`)
       return events
     } catch (err) {
-      throw new Error(`Failed to fetch events: ${err}`)
+      throw new Error(`Failed to fetch events: ${String(err)}`)
     }
   }
 
   async getEventByUid(uid: string): Promise<CalendarEvent | null> {
     try {
-      const objs = await fetchCalendarObjects({
+      fastify.log.info(`[CalDAV] Getting event by UID: ${uid}`)
+      const objs = await DAV.fetchCalendarObjects({
         account: this.account,
         url: this.calendarUrl,
       })
 
       for (const obj of objs) {
-        const jcal = ICAL.parse(obj.data)
-        const comp = new ICAL.Component(jcal)
-        const vevent = comp.getFirstSubcomponent('VEVENT')
-        if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
-          return this.parseEvent(vevent)
+        try {
+          const jcal = ICAL.parse(obj.data)
+          const comp = new ICAL.Component(jcal)
+          const vevent = comp.getFirstSubcomponent('VEVENT')
+          if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
+            return this.parseEvent(vevent)
+          }
+        } catch (parseErr) {
+          continue
         }
       }
       return null
     } catch (err) {
-      throw new Error(`Failed to fetch event: ${err}`)
+      throw new Error(`Failed to fetch event: ${String(err)}`)
     }
   }
 
   async createEvent(event: CalendarEvent): Promise<void> {
     try {
+      fastify.log.info(`[CalDAV] Creating event: ${event.uid}`)
       const ics = this.eventToICS(event)
-      await createCalendarObject({
+      await DAV.createCalendarObject({
         account: this.account,
         url: `${this.calendarUrl}${event.uid}.ics`,
         data: ics,
         contentType: 'text/calendar',
       })
+      fastify.log.info(`[CalDAV] Event created: ${event.uid}`)
     } catch (err) {
-      throw new Error(`Failed to create event: ${err}`)
+      throw new Error(`Failed to create event: ${String(err)}`)
     }
   }
 
   async updateEvent(event: CalendarEvent): Promise<void> {
     try {
+      fastify.log.info(`[CalDAV] Updating event: ${event.uid}`)
       const ics = this.eventToICS(event)
-      await updateCalendarObject({
+      await DAV.updateCalendarObject({
         account: this.account,
         url: `${this.calendarUrl}${event.uid}.ics`,
         data: ics,
         contentType: 'text/calendar',
       })
+      fastify.log.info(`[CalDAV] Event updated: ${event.uid}`)
     } catch (err) {
-      throw new Error(`Failed to update event: ${err}`)
+      throw new Error(`Failed to update event: ${String(err)}`)
     }
   }
 
   async deleteEvent(uid: string): Promise<void> {
     try {
-      await deleteCalendarObject({
+      fastify.log.info(`[CalDAV] Deleting event: ${uid}`)
+      await DAV.deleteCalendarObject({
         account: this.account,
         url: `${this.calendarUrl}${uid}.ics`,
       })
+      fastify.log.info(`[CalDAV] Event deleted: ${uid}`)
     } catch (err) {
-      throw new Error(`Failed to delete event: ${err}`)
+      throw new Error(`Failed to delete event: ${String(err)}`)
     }
   }
 
   private parseEvent(vevent: ICAL.Component): CalendarEvent {
     const uid = vevent.getFirstPropertyValue('uid') as string
-    const summary = vevent.getFirstPropertyValue('summary') as string || ''
-    const description = vevent.getFirstPropertyValue('description') as string || undefined
-    const location = vevent.getFirstPropertyValue('location') as string || undefined
+    const summary = (vevent.getFirstPropertyValue('summary') as string) || ''
+    const description = (vevent.getFirstPropertyValue('description') as string) || undefined
+    const location = (vevent.getFirstPropertyValue('location') as string) || undefined
     const dtstart = vevent.getFirstPropertyValue('dtstart') as ICAL.Time
     const dtend = vevent.getFirstPropertyValue('dtend') as ICAL.Time
     const rrule = vevent.getFirstPropertyValue('rrule')
@@ -193,7 +199,7 @@ export class CalDAVClient {
     vevent.addPropertyWithValue('dtend', dtend)
 
     if (event.rrule) {
-      vevent.getFirstProperty('rrule') || vevent.addProperty(ICAL.Property.fromString(`RRULE:${event.rrule}`))
+      vevent.addProperty(ICAL.Property.fromString(`RRULE:${event.rrule}`))
     }
 
     vevent.addPropertyWithValue('dtstamp', new ICAL.Time(new Date()))
