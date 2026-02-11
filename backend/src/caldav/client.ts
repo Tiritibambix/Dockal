@@ -4,15 +4,13 @@ import { CalendarEvent } from '../types.js'
 
 export class CalDAVClient {
   private account: any
-  private calendarUrl: string
+  private calendar: any
 
   constructor(
     private radicaleUrl: string,
     private username: string,
     private password: string,
-  ) {
-    this.calendarUrl = `${radicaleUrl}/${username}/calendar.ics/`
-  }
+  ) {}
 
   async initialize() {
     try {
@@ -27,22 +25,18 @@ export class CalDAVClient {
         loadCollections: true,
         loadObjects: false,
       })
-      console.log('[CalDAV] Initialized successfully')
+
+      // Get the default calendar
+      const calendars = this.account.calendars || []
+      this.calendar = calendars[0]
+      
+      if (!this.calendar) {
+        throw new Error('No calendar found')
+      }
+      
+      console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName}`)
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
-    }
-  }
-
-  async listCalendars() {
-    try {
-      console.log('[CalDAV] Listing calendars')
-      const calendars = await DAV.fetchCalendarObjects({
-        account: this.account,
-        url: this.calendarUrl,
-      })
-      return calendars
-    } catch (err) {
-      throw new Error(`Failed to list calendars: ${String(err)}`)
     }
   }
 
@@ -50,22 +44,26 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
-      const results = await DAV.fetchCalendarObjects({
-        account: this.account,
-        url: this.calendarUrl,
+      const objects = await DAV.listCalendarObjects({
+        calendar: this.calendar,
+        timeRange: {
+          start: from.toISOString(),
+          end: to.toISOString(),
+        }
       })
 
       const events: CalendarEvent[] = []
 
-      for (const obj of results) {
+      for (const obj of objects) {
         try {
-          const icsData = obj.data
-          const jcal = ICAL.parse(icsData)
-          const comp = new ICAL.Component(jcal)
-          const vevent = comp.getFirstSubcomponent('VEVENT')
+          if (obj.data) {
+            const jcal = ICAL.parse(obj.data)
+            const comp = new ICAL.Component(jcal)
+            const vevent = comp.getFirstSubcomponent('VEVENT')
 
-          if (vevent) {
-            events.push(this.parseEvent(vevent))
+            if (vevent) {
+              events.push(this.parseEvent(vevent))
+            }
           }
         } catch (parseErr) {
           console.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
@@ -76,25 +74,29 @@ export class CalDAVClient {
       console.log(`[CalDAV] Found ${events.length} events`)
       return events
     } catch (err) {
-      throw new Error(`Failed to fetch events: ${String(err)}`)
+      console.error(`[CalDAV] Error fetching events: ${String(err)}`)
+      return []
     }
   }
 
   async getEventByUid(uid: string): Promise<CalendarEvent | null> {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
-      const objs = await DAV.fetchCalendarObjects({
-        account: this.account,
-        url: this.calendarUrl,
+      
+      const objects = await DAV.listCalendarObjects({
+        calendar: this.calendar,
       })
 
-      for (const obj of objs) {
+      for (const obj of objects) {
         try {
-          const jcal = ICAL.parse(obj.data)
-          const comp = new ICAL.Component(jcal)
-          const vevent = comp.getFirstSubcomponent('VEVENT')
-          if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
-            return this.parseEvent(vevent)
+          if (obj.data) {
+            const jcal = ICAL.parse(obj.data)
+            const comp = new ICAL.Component(jcal)
+            const vevent = comp.getFirstSubcomponent('VEVENT')
+            
+            if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
+              return this.parseEvent(vevent)
+            }
           }
         } catch (parseErr) {
           continue
@@ -102,7 +104,8 @@ export class CalDAVClient {
       }
       return null
     } catch (err) {
-      throw new Error(`Failed to fetch event: ${String(err)}`)
+      console.warn(`[CalDAV] Event not found: ${uid}`)
+      return null
     }
   }
 
@@ -110,11 +113,11 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Creating event: ${event.uid}`)
       const ics = this.eventToICS(event)
+
       await DAV.createCalendarObject({
-        account: this.account,
-        url: `${this.calendarUrl}${event.uid}.ics`,
+        calendar: this.calendar,
+        filename: `${event.uid}.ics`,
         data: ics,
-        contentType: 'text/calendar',
       })
       console.log(`[CalDAV] Event created: ${event.uid}`)
     } catch (err) {
@@ -126,11 +129,12 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Updating event: ${event.uid}`)
       const ics = this.eventToICS(event)
+
       await DAV.updateCalendarObject({
-        account: this.account,
-        url: `${this.calendarUrl}${event.uid}.ics`,
-        data: ics,
-        contentType: 'text/calendar',
+        calendarObject: {
+          url: `${this.calendar.url}${event.uid}.ics`,
+          data: ics,
+        }
       })
       console.log(`[CalDAV] Event updated: ${event.uid}`)
     } catch (err) {
@@ -141,9 +145,11 @@ export class CalDAVClient {
   async deleteEvent(uid: string): Promise<void> {
     try {
       console.log(`[CalDAV] Deleting event: ${uid}`)
+      
       await DAV.deleteCalendarObject({
-        account: this.account,
-        url: `${this.calendarUrl}${uid}.ics`,
+        calendarObject: {
+          url: `${this.calendar.url}${uid}.ics`,
+        }
       })
       console.log(`[CalDAV] Event deleted: ${uid}`)
     } catch (err) {
