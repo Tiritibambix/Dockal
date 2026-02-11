@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import Fastify, { FastifyInstance } from 'fastify'
 import fastifyJwt from '@fastify/jwt'
 import fastifyCors from '@fastify/cors'
 import { CalDAVClient } from './caldav/client.js'
@@ -8,7 +8,7 @@ import { eventsRoutes } from './routes/events.js'
 import { calendarsRoutes } from './routes/calendars.js'
 
 const {
-  RADICALE_URL = 'http://localhost:5232',
+  RADICALE_URL = 'http://radicale:5232',
   RADICALE_USERNAME = 'user',
   RADICALE_PASSWORD = 'password',
   JWT_SECRET = 'dev-secret-key',
@@ -25,7 +25,7 @@ fastify.register(fastifyCors, {
   credentials: true,
 })
 
-// Add authenticate decorator used by routes
+// Decorator for routes to use
 fastify.decorate('authenticate', async function (request: any, reply: any) {
   try {
     await request.jwtVerify()
@@ -41,13 +41,13 @@ const caldavClient = new CalDAVClient(
   RADICALE_PASSWORD
 )
 
-// Routes
+// Routes (WITHOUT global preHandler)
 fastify.register((f: FastifyInstance) => authRoutes(f))
 fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
 fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
 
-// Health check (pas besoin d'auth)
-fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
+// Health check (no auth required)
+fastify.get('/health', async (request, reply) => {
   return reply.send({ status: 'ok' })
 })
 
