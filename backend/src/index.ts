@@ -41,20 +41,12 @@ const caldavClient = new CalDAVClient(
   RADICALE_PASSWORD
 )
 
-fastify.addHook('preHandler', async (request, reply) => {
-  try {
-    await request.jwtVerify()
-  } catch (err) {
-    reply.code(401).send({ error: 'Unauthorized' })
-  }
-})
-
 // Routes
 fastify.register((f: FastifyInstance) => authRoutes(f))
 fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
 fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
 
-// Health check
+// Health check (pas besoin d'auth)
 fastify.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
   return reply.send({ status: 'ok' })
 })

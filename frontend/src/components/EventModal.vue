@@ -64,26 +64,30 @@
             v-if="isEditing"
             type="button"
             @click="delete_"
-            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">
+            :disabled="isSaving"
+            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition disabled:opacity-50">
             Delete
           </button>
           <button
             v-if="isEditing"
             type="button"
             @click="showCopyPopup = true"
-            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition">
+            :disabled="isSaving"
+            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50">
             Copy
           </button>
           <button
             type="button"
             @click="cancel"
-            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition">
+            :disabled="isSaving"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50">
             Cancel
           </button>
           <button
             type="submit"
-            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">
-            Save
+            :disabled="isSaving"
+            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50">
+            {{ isSaving ? 'Saving...' : 'Save' }}
           </button>
         </div>
       </form>
@@ -99,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { CalendarEvent } from '../types'
 import CopyEventPopup from './CopyEventPopup.vue'
 
@@ -115,6 +119,7 @@ interface Props {
 const props = defineProps<Props>()
 const isEditing = ref(false)
 const showCopyPopup = ref(false)
+const isSaving = ref(false)
 
 const defaultForm = () => ({
   title: '',
@@ -132,8 +137,8 @@ const sourceEvent = ref<CalendarEvent | null>(null)
 watch(
   () => props.event,
   (newEvent) => {
-    if (newEvent) {
-      isEditing.value = true
+    if (newEvent && props.isOpen) {
+      isEditing.value = !!newEvent.uid
       sourceEvent.value = newEvent
       form.title = newEvent.title
       form.description = newEvent.description || ''
@@ -143,34 +148,47 @@ watch(
       form.start = newEvent.start.toISOString().slice(0, 16)
       form.end = newEvent.end.toISOString().slice(0, 16)
     } else {
+      Object.assign(form, defaultForm())
       isEditing.value = false
       sourceEvent.value = null
-      Object.assign(form, defaultForm())
     }
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 )
 
 const submit = async () => {
-  const event: CalendarEvent = {
-    uid: props.event?.uid || crypto.randomUUID(),
-    title: form.title,
-    description: form.description || undefined,
-    location: form.location || undefined,
-    start: new Date(form.start),
-    end: new Date(form.end),
-    allDay: form.allDay,
-    timezone: form.timezone,
+  if (!form.title.trim()) {
+    alert('Title is required')
+    return
   }
 
-  await props.onSave(event)
-  props.onCancel()
+  isSaving.value = true
+  try {
+    const event: CalendarEvent = {
+      uid: props.event?.uid || crypto.randomUUID(),
+      title: form.title,
+      description: form.description || undefined,
+      location: form.location || undefined,
+      start: new Date(form.start),
+      end: new Date(form.end),
+      allDay: form.allDay,
+      timezone: form.timezone,
+    }
+
+    await props.onSave(event)
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const delete_ = async () => {
   if (props.event && confirm('Delete this event?')) {
-    await props.onDelete(props.event.uid)
-    props.onCancel()
+    isSaving.value = true
+    try {
+      await props.onDelete(props.event.uid)
+    } finally {
+      isSaving.value = false
+    }
   }
 }
 
@@ -180,9 +198,13 @@ const cancel = () => {
 
 const handleCopy = async (dates: Date[]) => {
   if (props.event && props.onCopy) {
-    await props.onCopy(props.event.uid, dates)
-    showCopyPopup.value = false
-    props.onCancel()
+    isSaving.value = true
+    try {
+      await props.onCopy(props.event.uid, dates)
+      showCopyPopup.value = false
+    } finally {
+      isSaving.value = false
+    }
   }
 }
 </script>

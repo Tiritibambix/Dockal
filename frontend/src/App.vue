@@ -8,10 +8,10 @@
       <EventModal
         :isOpen="showEventModal"
         :event="currentEvent"
-        @save="saveEvent"
-        @delete="deleteEvent"
-        @cancel="showEventModal = false"
-        @copy="copyEvent"
+        :onSave="saveEvent"
+        :onDelete="deleteEvent"
+        :onCancel="closeModal"
+        :onCopy="copyEvent"
       />
     </main>
   </div>
@@ -22,12 +22,16 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { CalendarEvent } from './types'
 import EventModal from './components/EventModal.vue'
 import { APIClient } from './api/client'
 
-const calendarOptions = ref({
+const showEventModal = ref(false)
+const currentEvent = ref<CalendarEvent | null>(null)
+const apiClient = new APIClient(localStorage.getItem('token') || undefined)
+
+const calendarOptions = reactive({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
   initialView: 'dayGridMonth',
   headerToolbar: {
@@ -51,21 +55,14 @@ const calendarOptions = ref({
   validRange: {
     start: new Date()
   },
-  eventLimit: 3,
-  eventLimitClick: 'popover',
-  eventOverlap: false,
-  selectOverlap: false
 })
-
-const showEventModal = ref(false)
-const currentEvent = ref<CalendarEvent | null>(null)
-const apiClient = new APIClient(localStorage.getItem('token') || undefined)
 
 async function fetchEvents(info, successCallback, failureCallback) {
   try {
     const events = await apiClient.getEvents(info.start, info.end)
     successCallback(events)
   } catch (error) {
+    console.error('Error fetching events:', error)
     failureCallback(error)
   }
 }
@@ -88,33 +85,56 @@ function handleEventClick(clickInfo) {
 }
 
 async function handleEventDrop(info) {
-  const event = info.event.extendedProps as CalendarEvent
-  event.start = info.event.start
-  event.end = info.event.end
-  await saveEvent(event)
+  try {
+    const event = info.event.extendedProps as CalendarEvent
+    event.start = info.event.start || event.start
+    event.end = info.event.end || event.end
+    await saveEvent(event)
+  } catch (err) {
+    console.error('Error dropping event:', err)
+  }
 }
 
 async function handleEventResize(info) {
-  const event = info.event.extendedProps as CalendarEvent
-  event.start = info.event.start
-  event.end = info.event.end
-  await saveEvent(event)
+  try {
+    const event = info.event.extendedProps as CalendarEvent
+    event.start = info.event.start || event.start
+    event.end = info.event.end || event.end
+    await saveEvent(event)
+  } catch (err) {
+    console.error('Error resizing event:', err)
+  }
 }
 
 async function saveEvent(event: CalendarEvent) {
-  if (event.uid) {
-    await apiClient.updateEvent(event)
-  } else {
-    await apiClient.createEvent(event)
+  try {
+    if (event.uid) {
+      await apiClient.updateEvent(event)
+    } else {
+      await apiClient.createEvent(event)
+    }
+    closeModal()
+  } catch (err) {
+    console.error('Error saving event:', err)
   }
 }
 
 async function deleteEvent(uid: string) {
-  await apiClient.deleteEvent(uid)
+  try {
+    await apiClient.deleteEvent(uid)
+    closeModal()
+  } catch (err) {
+    console.error('Error deleting event:', err)
+  }
 }
 
 async function copyEvent(uid: string, dates: Date[]) {
-  await apiClient.copyEvent(uid, { dates: dates.map(d => d.toISOString()) })
+  try {
+    await apiClient.copyEvent(uid, { dates: dates.map(d => d.toISOString()) })
+    closeModal()
+  } catch (err) {
+    console.error('Error copying event:', err)
+  }
 }
 
 function handleDateClick(arg) {
@@ -122,11 +142,16 @@ function handleDateClick(arg) {
     uid: '',
     title: '',
     start: arg.date,
-    end: arg.date,
+    end: new Date(arg.date.getTime() + 60 * 60 * 1000),
     allDay: true,
     timezone: 'UTC'
   }
   showEventModal.value = true
+}
+
+function closeModal() {
+  showEventModal.value = false
+  currentEvent.value = null
 }
 
 function renderEventContent(arg) {
@@ -152,7 +177,7 @@ function transformEventData(eventData) {
 }
 
 onMounted(() => {
-  // Additional initialization if needed
+  console.log('App mounted')
 })
 </script>
 
