@@ -1,5 +1,4 @@
 import * as DAV from 'dav'
-import ICAL from 'ical.js'
 import { v4 as uuidv4 } from 'uuid'
 import { CalendarEvent } from '../types.js'
 import * as http from 'http'
@@ -37,7 +36,7 @@ export class CalDAVClient {
         throw new Error('No calendar found')
       }
       
-      console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName} (${this.calendar.url})`)
+      console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName}`)
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
@@ -67,80 +66,49 @@ export class CalDAVClient {
           const icsData = await this.fetchCalendarObjectData(url)
           
           if (!icsData) {
-            console.warn(`[CalDAV] Object ${i} (${url}) has no data`)
             continue
           }
 
-          if (i < 3) {
-            console.log(`[CalDAV] Object ${i} data (first 300 chars): ${icsData.substring(0, 300)}`)
-          }
-          
-          console.log(`[CalDAV] Parsing object ${i}`)
-          
-          // Parse entire ICS file directly
-          try {
-            const jcal = ICAL.parse(icsData)
-            const comp = new ICAL.Component(jcal)
-            const vevent = comp.getFirstSubcomponent('VEVENT')
-            
-            if (vevent) {
-              const event = this.parseEvent(vevent)
-              events.push(event)
-              console.log(`[CalDAV] Parsed event (direct): ${event.title}`)
-            } else {
-              console.warn(`[CalDAV] No VEVENT in object ${i}`)
-            }
-          } catch (icalErr) {
-            console.warn(`[CalDAV] ICAL parsing failed for object ${i}: ${String(icalErr)}`)
-            console.log(`[CalDAV] Raw data sample: ${icsData.substring(0, 500)}`)
+          const event = this.parseICSText(icsData)
+          if (event) {
+            events.push(event)
+            console.log(`[CalDAV] ✓ Parsed: ${event.title}`)
           }
         } catch (parseErr) {
-          console.warn(`[CalDAV] Failed to process object ${i} (${url}): ${String(parseErr)}`)
-          continue
+          console.warn(`[CalDAV] Parse error object ${i}: ${String(parseErr)}`)
         }
       }
 
-      console.log(`[CalDAV] Found ${events.length} events`)
+      console.log(`[CalDAV] Total: ${events.length} events`)
       return events
     } catch (err) {
-      console.error(`[CalDAV] Error fetching events: ${String(err)}`)
+      console.error(`[CalDAV] Error: ${String(err)}`)
       return []
     }
   }
 
   async getEventByUid(uid: string): Promise<CalendarEvent | null> {
     try {
-      console.log(`[CalDAV] Getting event by UID: ${uid}`)
-      
       const objectUrls = await this.listCalendarObjectUrls()
 
       for (const url of objectUrls) {
-        try {
-          const icsData = await this.fetchCalendarObjectData(url)
-          
-          if (!icsData) continue
+        const icsData = await this.fetchCalendarObjectData(url)
+        if (!icsData) continue
 
-          const jcal = ICAL.parse(icsData)
-          const comp = new ICAL.Component(jcal)
-          const vevent = comp.getFirstSubcomponent('VEVENT')
-          
-          if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
-            return this.parseEvent(vevent)
-          }
-        } catch (parseErr) {
-          continue
+        const event = this.parseICSText(icsData)
+        if (event && event.uid === uid) {
+          return event
         }
       }
       return null
     } catch (err) {
-      console.warn(`[CalDAV] Event not found: ${uid}`)
       return null
     }
   }
 
   async createEvent(event: CalendarEvent): Promise<void> {
     try {
-      console.log(`[CalDAV] Creating event: ${event.uid}`)
+      console.log(`[CalDAV] Creating: ${event.uid}`)
       const ics = this.eventToICS(event)
 
       await DAV.createCalendarObject({
@@ -148,7 +116,7 @@ export class CalDAVClient {
         filename: `${event.uid}.ics`,
         data: ics,
       })
-      console.log(`[CalDAV] Event created: ${event.uid}`)
+      console.log(`[CalDAV] ✓ Created: ${event.uid}`)
     } catch (err) {
       throw new Error(`Failed to create event: ${String(err)}`)
     }
@@ -156,7 +124,7 @@ export class CalDAVClient {
 
   async updateEvent(event: CalendarEvent): Promise<void> {
     try {
-      console.log(`[CalDAV] Updating event: ${event.uid}`)
+      console.log(`[CalDAV] Updating: ${event.uid}`)
       const ics = this.eventToICS(event)
 
       await DAV.updateCalendarObject({
@@ -165,7 +133,7 @@ export class CalDAVClient {
           data: ics,
         }
       })
-      console.log(`[CalDAV] Event updated: ${event.uid}`)
+      console.log(`[CalDAV] ✓ Updated: ${event.uid}`)
     } catch (err) {
       throw new Error(`Failed to update event: ${String(err)}`)
     }
@@ -173,14 +141,14 @@ export class CalDAVClient {
 
   async deleteEvent(uid: string): Promise<void> {
     try {
-      console.log(`[CalDAV] Deleting event: ${uid}`)
+      console.log(`[CalDAV] Deleting: ${uid}`)
       
       await DAV.deleteCalendarObject({
         calendarObject: {
           url: `${this.calendar.url}${uid}.ics`,
         }
       })
-      console.log(`[CalDAV] Event deleted: ${uid}`)
+      console.log(`[CalDAV] ✓ Deleted: ${uid}`)
     } catch (err) {
       throw new Error(`Failed to delete event: ${String(err)}`)
     }
@@ -199,9 +167,7 @@ export class CalDAVClient {
       hostname: url.hostname,
       port: url.port || (isHttps ? 443 : 80),
       path: url.pathname + (url.search || ''),
-      headers: {
-        ...headers,
-      },
+      headers: { ...headers },
     }
     const auth = this.buildAuthHeader()
     if (auth) options.headers['Authorization'] = auth
@@ -223,7 +189,6 @@ export class CalDAVClient {
     try {
       const urls: string[] = []
       const calendarUrl = this.calendar.url
-      console.log(`[CalDAV] Listing objects from ${calendarUrl}`)
 
       const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
 <propfind xmlns="DAV:">
@@ -243,13 +208,10 @@ export class CalDAVClient {
             urls.push(full)
           }
         }
-      } else {
-        console.warn(`[CalDAV] PROPFIND returned ${res.status}`)
       }
-      console.log(`[CalDAV] Found ${urls.length} .ics files`)
       return urls
     } catch (err) {
-      console.error(`[CalDAV] Error listing calendar objects: ${String(err)}`)
+      console.error(`[CalDAV] PROPFIND error: ${String(err)}`)
       return []
     }
   }
@@ -257,69 +219,149 @@ export class CalDAVClient {
   private async fetchCalendarObjectData(url: string): Promise<string | null> {
     try {
       const res = await this.httpRequest(url, 'GET', undefined, { Accept: 'text/calendar' })
-      if (res.status === 200) return res.body
-      console.warn(`[CalDAV] GET ${url} returned ${res.status}`)
-      return null
+      return res.status === 200 ? res.body : null
     } catch (err) {
-      console.error(`[CalDAV] Error fetching object ${url}: ${String(err)}`)
       return null
     }
   }
 
-  private parseEvent(vevent: ICAL.Component): CalendarEvent {
-    const uid = vevent.getFirstPropertyValue('uid') as string
-    const summary = (vevent.getFirstPropertyValue('summary') as string) || ''
-    const description = (vevent.getFirstPropertyValue('description') as string) || undefined
-    const location = (vevent.getFirstPropertyValue('location') as string) || undefined
-    const dtstart = vevent.getFirstPropertyValue('dtstart') as ICAL.Time
-    const dtend = vevent.getFirstPropertyValue('dtend') as ICAL.Time
-    const rrule = vevent.getFirstPropertyValue('rrule')
-    const tzid = dtstart?.timezone || 'UTC'
+  private parseICSText(icsData: string): CalendarEvent | null {
+    try {
+      const lines = icsData.split(/\r?\n/)
+      const props: { [key: string]: string } = {}
+      
+      let currentProp = ''
+      for (const line of lines) {
+        if (line.match(/^\s/) && currentProp) {
+          props[currentProp] += line.trim()
+        } else {
+          const [key, ...valueParts] = line.split(':')
+          if (key && valueParts.length > 0) {
+            currentProp = key.split(';')[0].toUpperCase()
+            props[currentProp] = valueParts.join(':').trim()
+          }
+        }
+      }
 
-    const start = new Date(dtstart.toJSDate())
-    const end = new Date(dtend.toJSDate())
-    const allDay = dtstart.isDate
+      const uid = props['UID'] || `temp-${uuidv4()}`
+      const title = props['SUMMARY'] || 'Untitled'
+      const description = props['DESCRIPTION'] || undefined
+      const location = props['LOCATION'] || undefined
 
-    return {
-      uid,
-      title: summary,
-      description,
-      location,
-      start,
-      end,
-      allDay,
-      timezone: tzid,
-      rrule: rrule ? rrule.toICALString() : undefined,
+      const dtStartStr = props['DTSTART']
+      const dtEndStr = props['DTEND']
+
+      if (!dtStartStr) {
+        return null
+      }
+
+      const start = this.parseDate(dtStartStr)
+      const end = this.parseDate(dtEndStr || dtStartStr)
+
+      if (!start || !end) {
+        return null
+      }
+
+      const allDay = /VALUE=DATE[^-]/.test(dtStartStr)
+
+      return {
+        uid,
+        title,
+        description,
+        location,
+        start,
+        end,
+        allDay,
+        timezone: 'UTC',
+      }
+    } catch (err) {
+      return null
+    }
+  }
+
+  private parseDate(dateStr: string): Date | null {
+    try {
+      const cleanDate = dateStr.split(';').pop() || ''
+
+      if (/^\d{8}$/.test(cleanDate)) {
+        const year = parseInt(cleanDate.slice(0, 4), 10)
+        const month = parseInt(cleanDate.slice(4, 6), 10) - 1
+        const day = parseInt(cleanDate.slice(6, 8), 10)
+        return new Date(year, month, day)
+      }
+
+      if (/^\d{8}T\d{6}Z?$/.test(cleanDate)) {
+        const year = parseInt(cleanDate.slice(0, 4), 10)
+        const month = parseInt(cleanDate.slice(4, 6), 10) - 1
+        const day = parseInt(cleanDate.slice(6, 8), 10)
+        const hour = parseInt(cleanDate.slice(9, 11), 10)
+        const minute = parseInt(cleanDate.slice(11, 13), 10)
+        const second = parseInt(cleanDate.slice(13, 15), 10)
+        return new Date(year, month, day, hour, minute, second)
+      }
+
+      return new Date(cleanDate)
+    } catch (err) {
+      return null
     }
   }
 
   private eventToICS(event: CalendarEvent): string {
-    const comp = new ICAL.Component('VCALENDAR')
-    comp.addPropertyWithValue('version', '2.0')
-    comp.addPropertyWithValue('prodid', '-//Dockal//Dockal//EN')
-    comp.addPropertyWithValue('calscale', 'GREGORIAN')
-
-    const vevent = new ICAL.Component('VEVENT')
-    vevent.addPropertyWithValue('uid', event.uid)
-    vevent.addPropertyWithValue('summary', event.title)
-    if (event.description) vevent.addPropertyWithValue('description', event.description)
-    if (event.location) vevent.addPropertyWithValue('location', event.location)
-
-    const dtstart = ICAL.Time.fromJSDate(event.start, !event.allDay)
-    dtstart.timezone = event.timezone
-    vevent.addPropertyWithValue('dtstart', dtstart)
-
-    const dtend = ICAL.Time.fromJSDate(event.end, !event.allDay)
-    dtend.timezone = event.timezone
-    vevent.addPropertyWithValue('dtend', dtend)
-
-    if (event.rrule) {
-      vevent.addProperty(ICAL.Property.fromString(`RRULE:${event.rrule}`))
+    const comp = {
+      toString: () => {
+        const lines: string[] = []
+        lines.push('BEGIN:VCALENDAR')
+        lines.push('VERSION:2.0')
+        lines.push('PRODID:-//Dockal//Dockal//EN')
+        lines.push('CALSCALE:GREGORIAN')
+        
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${event.uid}`)
+        lines.push(`SUMMARY:${this.escapeValue(event.title)}`)
+        
+        if (event.description) {
+          lines.push(`DESCRIPTION:${this.escapeValue(event.description)}`)
+        }
+        if (event.location) {
+          lines.push(`LOCATION:${this.escapeValue(event.location)}`)
+        }
+        
+        lines.push(`DTSTART${event.allDay ? ';VALUE=DATE' : ''}:${this.formatDate(event.start, event.allDay)}`)
+        lines.push(`DTEND${event.allDay ? ';VALUE=DATE' : ''}:${this.formatDate(event.end, event.allDay)}`)
+        lines.push(`DTSTAMP:${this.formatDate(new Date(), false)}`)
+        
+        lines.push('END:VEVENT')
+        lines.push('END:VCALENDAR')
+        
+        return lines.join('\r\n')
+      }
     }
-
-    vevent.addPropertyWithValue('dtstamp', new ICAL.Time(new Date()))
-    comp.addSubcomponent(vevent)
-
+    
     return comp.toString()
+  }
+
+  private escapeValue(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n')
+  }
+
+  private formatDate(date: Date, allDay: boolean): string {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const year = date.getFullYear()
+    const month = pad(date.getMonth() + 1)
+    const day = pad(date.getDate())
+    
+    if (allDay) {
+      return `${year}${month}${day}`
+    }
+    
+    const hour = pad(date.getHours())
+    const minute = pad(date.getMinutes())
+    const second = pad(date.getSeconds())
+    
+    return `${year}${month}${day}T${hour}${minute}${second}Z`
   }
 }
