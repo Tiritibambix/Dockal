@@ -18,12 +18,15 @@ const {
 
 const fastify: FastifyInstance = Fastify({ logger: true })
 
-// Register plugins
-fastify.register(fastifyJwt, { secret: JWT_SECRET })
+// Register CORS FIRST, before other plugins
 fastify.register(fastifyCors, {
-  origin: FRONTEND_URL,
+  origin: true, // Allow all origins in development, or specify: FRONTEND_URL
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 })
+
+// JWT authentication plugin
+fastify.register(fastifyJwt, { secret: JWT_SECRET })
 
 // Decorator for routes to use
 fastify.decorate('authenticate', async function (request: any, reply: any) {
@@ -34,7 +37,6 @@ fastify.decorate('authenticate', async function (request: any, reply: any) {
   }
 })
 
-// CalDAV client
 const caldavClient = new CalDAVClient(
   RADICALE_URL,
   RADICALE_USERNAME,
