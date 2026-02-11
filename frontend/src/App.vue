@@ -47,7 +47,14 @@ const calendarOptions = ref({
   eventResize: handleEventResize,
   dateClick: handleDateClick,
   eventContent: renderEventContent,
-  eventDataTransform: transformEventData
+  eventDataTransform: transformEventData,
+  validRange: {
+    start: new Date()
+  },
+  eventLimit: 3,
+  eventLimitClick: 'popover',
+  eventOverlap: false,
+  selectOverlap: false
 })
 
 const showEventModal = ref(false)
