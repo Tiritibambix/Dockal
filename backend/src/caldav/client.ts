@@ -77,32 +77,22 @@ export class CalDAVClient {
           
           console.log(`[CalDAV] Parsing object ${i}`)
           
-          // Extract VEVENT blocks using regex
-          const vEventMatches = icsData.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) || []
-          console.log(`[CalDAV] Object ${i} contains ${vEventMatches.length} VEVENT(s) (regex match)`)
-
-          // Parse each VEVENT block by wrapping in VCALENDAR
-          for (let j = 0; j < vEventMatches.length; j++) {
-            try {
-              const vEventBlock = vEventMatches[j]
-              const wrappedICS = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Dockal//EN\n${vEventBlock}\nEND:VCALENDAR`
-              
-              console.log(`[CalDAV] Parsing VEVENT ${j} from object ${i}`)
-              
-              const jcal = ICAL.parse(wrappedICS)
-              const comp = new ICAL.Component(jcal)
-              const vevent = comp.getFirstSubcomponent('VEVENT')
-              
-              if (vevent) {
-                const event = this.parseEvent(vevent)
-                events.push(event)
-                console.log(`[CalDAV] Parsed event: ${event.title} (${event.start})`)
-              } else {
-                console.warn(`[CalDAV] No VEVENT component found in wrapped ICS for object ${i} VEVENT ${j}`)
-              }
-            } catch (fallbackErr) {
-              console.warn(`[CalDAV] Error parsing VEVENT ${j} from object ${i}: ${String(fallbackErr)}`)
+          // Parse entire ICS file directly
+          try {
+            const jcal = ICAL.parse(icsData)
+            const comp = new ICAL.Component(jcal)
+            const vevent = comp.getFirstSubcomponent('VEVENT')
+            
+            if (vevent) {
+              const event = this.parseEvent(vevent)
+              events.push(event)
+              console.log(`[CalDAV] Parsed event (direct): ${event.title}`)
+            } else {
+              console.warn(`[CalDAV] No VEVENT in object ${i}`)
             }
+          } catch (icalErr) {
+            console.warn(`[CalDAV] ICAL parsing failed for object ${i}: ${String(icalErr)}`)
+            console.log(`[CalDAV] Raw data sample: ${icsData.substring(0, 500)}`)
           }
         } catch (parseErr) {
           console.warn(`[CalDAV] Failed to process object ${i} (${url}): ${String(parseErr)}`)
