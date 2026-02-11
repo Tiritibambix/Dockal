@@ -6,6 +6,7 @@ import { CalendarEvent } from '../types.js'
 export class CalDAVClient {
   private account: any
   private calendar: any
+  private xhr: any
 
   constructor(
     private radicaleUrl: string,
@@ -17,14 +18,14 @@ export class CalDAVClient {
     try {
       console.log('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
-      const xhr = new DAV.transport.Basic(creds)
+      this.xhr = new DAV.transport.Basic(creds)
 
       this.account = await DAV.createAccount({
         server: this.radicaleUrl,
-        xhr,
+        xhr: this.xhr,
         accountType: 'caldav',
         loadCollections: true,
-        loadObjects: true,
+        loadObjects: false, // Don't load objects yet, we'll fetch them manually
       })
 
       const calendars = this.account.calendars || []
@@ -35,7 +36,6 @@ export class CalDAVClient {
       }
       
       console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName}`)
-      console.log(`[CalDAV] Calendar has ${(this.calendar.objects || []).length} objects`)
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
@@ -55,22 +55,26 @@ export class CalDAVClient {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
       const events: CalendarEvent[] = []
-      const objects = this.calendar.objects || []
       
-      console.log(`[CalDAV] Processing ${objects.length} calendar objects`)
+      // Fetch calendar objects (just metadata)
+      const objects = await DAV.listCalendarObjects({
+        calendar: this.calendar,
+      })
+      
+      console.log(`[CalDAV] Found ${objects.length} calendar objects`)
 
       for (let i = 0; i < objects.length; i++) {
         const obj = objects[i]
         try {
-          // Extract ICS data from DAV object
-          let icsData = this.extractICSData(obj)
+          // Fetch the actual ICS data for this object
+          const icsData = await this.fetchCalendarObjectData(obj.url)
           
           if (!icsData) {
-            console.warn(`[CalDAV] Object ${i} has no data`)
+            console.warn(`[CalDAV] Object ${i} (${obj.url}) has no data`)
             continue
           }
 
-          console.log(`[CalDAV] Parsing object ${i}: ${icsData.substring(0, 100)}...`)
+          console.log(`[CalDAV] Parsing object ${i} (${obj.url})`)
           
           const jcal = ICAL.parse(icsData)
           const comp = new ICAL.Component(jcal)
@@ -79,14 +83,10 @@ export class CalDAVClient {
           if (vevent) {
             const event = this.parseEvent(vevent)
             events.push(event)
-            console.log(`[CalDAV] Parsed event: ${event.title} (${event.uid})`)
+            console.log(`[CalDAV] Parsed event: ${event.title}`)
           }
         } catch (parseErr) {
           console.warn(`[CalDAV] Failed to parse object ${i}: ${String(parseErr)}`)
-          if (obj.data) {
-            const dataStr = typeof obj.data === 'string' ? obj.data : JSON.stringify(obj.data)
-            console.warn(`[CalDAV] Data: ${dataStr.substring(0, 200)}`)
-          }
           continue
         }
       }
@@ -103,11 +103,13 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      const objects = this.calendar.objects || []
+      const objects = await DAV.listCalendarObjects({
+        calendar: this.calendar,
+      })
 
       for (const obj of objects) {
         try {
-          const icsData = this.extractICSData(obj)
+          const icsData = await this.fetchCalendarObjectData(obj.url)
           
           if (!icsData) continue
 
@@ -177,29 +179,25 @@ export class CalDAVClient {
     }
   }
 
-  private extractICSData(obj: any): string | null {
-    // obj.data peut être dans plusieurs formats
-    if (typeof obj.data === 'string') {
-      return obj.data
-    }
-    
-    if (obj.data && typeof obj.data === 'object') {
-      // Si c'est un objet, chercher la propriété qui contient le texte
-      if (obj.data.toString && obj.data.toString() !== '[object Object]') {
-        return obj.data.toString()
+  private async fetchCalendarObjectData(url: string): Promise<string | null> {
+    try {
+      const response = await this.xhr.request({
+        url: url,
+        method: 'GET',
+        headers: {
+          'Accept': 'text/calendar',
+        }
+      })
+
+      if (response.status === 200) {
+        const data = response.body || response.responseText || response.text
+        return typeof data === 'string' ? data : data?.toString() || null
       }
-      // Chercher une propriété 'text' ou 'content'
-      if (typeof obj.data.text === 'string') return obj.data.text
-      if (typeof obj.data.content === 'string') return obj.data.content
-      if (typeof obj.data.value === 'string') return obj.data.value
+      return null
+    } catch (err) {
+      console.error(`[CalDAV] Error fetching object ${url}: ${String(err)}`)
+      return null
     }
-    
-    // Essayer d'accéder directement à obj pour les cas où data = l'objet lui-même
-    if (typeof obj === 'string') {
-      return obj
-    }
-    
-    return null
   }
 
   private parseEvent(vevent: ICAL.Component): CalendarEvent {
