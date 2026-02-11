@@ -40,16 +40,22 @@ export class CalDAVClient {
     }
   }
 
+  async listCalendars() {
+    try {
+      console.log('[CalDAV] Listing calendars')
+      return this.account.calendars || []
+    } catch (err) {
+      throw new Error(`Failed to list calendars: ${String(err)}`)
+    }
+  }
+
   async getEvents(from: Date, to: Date): Promise<CalendarEvent[]> {
     try {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
-      const objects = await DAV.listCalendarObjects({
+      const objects = await DAV.syncCalendar({
         calendar: this.calendar,
-        timeRange: {
-          start: from.toISOString(),
-          end: to.toISOString(),
-        }
+        loadObjects: true,
       })
 
       const events: CalendarEvent[] = []
@@ -83,8 +89,9 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      const objects = await DAV.listCalendarObjects({
+      const objects = await DAV.syncCalendar({
         calendar: this.calendar,
+        loadObjects: true,
       })
 
       for (const obj of objects) {
