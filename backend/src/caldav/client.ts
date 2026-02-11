@@ -2,6 +2,9 @@ import * as DAV from 'dav'
 import ICAL from 'ical.js'
 import { v4 as uuidv4 } from 'uuid'
 import { CalendarEvent } from '../types.js'
+import * as http from 'http'
+import * as https from 'https'
+import { URL } from 'url'
 
 export class CalDAVClient {
   private account: any
@@ -22,7 +25,7 @@ export class CalDAVClient {
 
       this.account = await DAV.createAccount({
         server: this.radicaleUrl,
-        xhr: this.xhr,
+        xhr: new DAV.transport.Basic(new DAV.Credentials({ username: this.username, password: this.password })),
         accountType: 'caldav',
         loadCollections: true,
         loadObjects: false,
@@ -174,42 +177,67 @@ export class CalDAVClient {
     }
   }
 
+  private buildAuthHeader(): string | undefined {
+    if (!this.username && !this.password) return undefined
+    return 'Basic ' + Buffer.from(`${this.username}:${this.password}`).toString('base64')
+  }
+
+  private async httpRequest(urlStr: string, method = 'GET', body?: string, headers: Record<string, string> = {}): Promise<{ status: number; body: string }> {
+    const url = new URL(urlStr)
+    const isHttps = url.protocol === 'https:'
+    const options: any = {
+      method,
+      hostname: url.hostname,
+      port: url.port || (isHttps ? 443 : 80),
+      path: url.pathname + (url.search || ''),
+      headers: {
+        ...headers,
+      },
+    }
+    const auth = this.buildAuthHeader()
+    if (auth) options.headers['Authorization'] = auth
+
+    return new Promise((resolve, reject) => {
+      const req = (isHttps ? https : http).request(options, (res) => {
+        let data = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => resolve({ status: res.statusCode || 0, body: data }))
+      })
+      req.on('error', reject)
+      if (body) req.write(body)
+      req.end()
+    })
+  }
+
   private async listCalendarObjectUrls(): Promise<string[]> {
     try {
       const urls: string[] = []
       const calendarUrl = this.calendar.url
-      
       console.log(`[CalDAV] Listing objects from ${calendarUrl}`)
-      
-      const response = await this.xhr.request({
-        url: calendarUrl,
-        method: 'PROPFIND',
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml',
-        },
-        data: `<?xml version="1.0" encoding="utf-8" ?>
+
+      const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
 <propfind xmlns="DAV:">
   <prop>
     <resourcetype/>
   </prop>
-</propfind>`,
-      })
+</propfind>`
 
-      // Parse response to extract href values
-      if (response.status === 207 && response.body) {
-        const body = response.body
+      const res = await this.httpRequest(calendarUrl, 'PROPFIND', propfindBody, { Depth: '1', 'Content-Type': 'application/xml' })
+      if (res.status === 207 && res.body) {
         const hrefRegex = /<href>(.*?)<\/href>/g
         let match
-        while ((match = hrefRegex.exec(body)) !== null) {
+        while ((match = hrefRegex.exec(res.body)) !== null) {
           const href = match[1]
-          // Skip the parent collection URL, only get .ics files
-          if (href !== calendarUrl && href.endsWith('.ics')) {
-            urls.push(href)
+          if (!href.endsWith('/') && href.endsWith('.ics')) {
+            // Normalise relative hrefs to absolute if needed
+            const full = href.startsWith('http') ? href : new URL(href, calendarUrl).toString()
+            urls.push(full)
           }
         }
+      } else {
+        console.warn(`[CalDAV] PROPFIND returned ${res.status}`)
       }
-      
       console.log(`[CalDAV] Found ${urls.length} .ics files`)
       return urls
     } catch (err) {
@@ -220,18 +248,9 @@ export class CalDAVClient {
 
   private async fetchCalendarObjectData(url: string): Promise<string | null> {
     try {
-      const response = await this.xhr.request({
-        url: url,
-        method: 'GET',
-        headers: {
-          'Accept': 'text/calendar',
-        }
-      })
-
-      if (response.status === 200) {
-        const data = response.body || response.responseText || response.text
-        return typeof data === 'string' ? data : data?.toString() || null
-      }
+      const res = await this.httpRequest(url, 'GET', undefined, { Accept: 'text/calendar' })
+      if (res.status === 200) return res.body
+      console.warn(`[CalDAV] GET ${url} returned ${res.status}`)
       return null
     } catch (err) {
       console.error(`[CalDAV] Error fetching object ${url}: ${String(err)}`)
