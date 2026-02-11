@@ -57,7 +57,7 @@ export class CalDAVClient {
       const events: CalendarEvent[] = []
       
       // Fetch calendar objects (just metadata)
-      const objects = await DAV.listCalendarObjects({
+      const objects = await DAV.fetchCalendarObjects({
         calendar: this.calendar,
       })
       
@@ -103,7 +103,7 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      const objects = await DAV.listCalendarObjects({
+      const objects = await DAV.fetchCalendarObjects({
         calendar: this.calendar,
       })
 
