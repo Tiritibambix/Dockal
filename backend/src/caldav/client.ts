@@ -74,19 +74,29 @@ export class CalDAVClient {
             continue
           }
 
+          if (i < 3) {
+            console.log(`[CalDAV] Object ${i} data (first 300 chars): ${icsData.substring(0, 300)}`)
+          }
+          
           console.log(`[CalDAV] Parsing object ${i}`)
           
           const jcal = ICAL.parse(icsData)
           const comp = new ICAL.Component(jcal)
-          const vevent = comp.getFirstSubcomponent('VEVENT')
+          const vevents = comp.getAllSubcomponents('VEVENT')
 
-          if (vevent) {
-            const event = this.parseEvent(vevent)
-            events.push(event)
-            console.log(`[CalDAV] Parsed event: ${event.title}`)
+          console.log(`[CalDAV] Object ${i} contains ${vevents.length} VEVENT(s)`)
+
+          for (const vevent of vevents) {
+            try {
+              const event = this.parseEvent(vevent)
+              events.push(event)
+              console.log(`[CalDAV] Parsed event: ${event.title}`)
+            } catch (eventErr) {
+              console.warn(`[CalDAV] Failed to parse VEVENT in object ${i}: ${String(eventErr)}`)
+            }
           }
         } catch (parseErr) {
-          console.warn(`[CalDAV] Failed to parse object ${i}: ${String(parseErr)}`)
+          console.warn(`[CalDAV] Failed to parse object ${i} (${url}): ${String(parseErr)}`)
           continue
         }
       }
