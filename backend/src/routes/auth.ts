@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { AuthPayload } from '../types.js'
 
 export async function authRoutes(fastify: FastifyInstance) {
+  // Login route - NO authentication required
   fastify.post<{ Body: AuthPayload }>(
     '/auth/login',
     async (request: FastifyRequest<{ Body: AuthPayload }>, reply: FastifyReply) => {
@@ -19,7 +20,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         { expiresIn: '7d' }
       )
 
-      fastify.log.info(`[POST /auth/login] Login successful`)
+      fastify.log.info(`[POST /auth/login] Login successful for ${username}`)
       return reply.send({ token, username })
     }
   )
