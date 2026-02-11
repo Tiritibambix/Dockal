@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { CalendarEvent, CopyEventPayload } from '../types.js'
 import { CalDAVClient } from '../caldav/client.js'
 
-export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClient) {
+export async function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClient) {
   // GET /events?from=2026-01-01&to=2026-12-31
   fastify.get<{ Querystring: { from: string; to: string } }>(
     '/events',
