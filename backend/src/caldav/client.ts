@@ -9,7 +9,6 @@ import { URL } from 'url'
 export class CalDAVClient {
   private account: any
   private calendar: any
-  private xhr: any
 
   constructor(
     private radicaleUrl: string,
@@ -21,11 +20,11 @@ export class CalDAVClient {
     try {
       console.log('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
-      this.xhr = new DAV.transport.Basic(creds)
+      const xhr = new DAV.transport.Basic(creds)
 
       this.account = await DAV.createAccount({
         server: this.radicaleUrl,
-        xhr: new DAV.transport.Basic(new DAV.Credentials({ username: this.username, password: this.password })),
+        xhr,
         accountType: 'caldav',
         loadCollections: true,
         loadObjects: false,
@@ -58,8 +57,6 @@ export class CalDAVClient {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
       const events: CalendarEvent[] = []
-      
-      // Get list of calendar object URLs
       const objectUrls = await this.listCalendarObjectUrls()
       
       console.log(`[CalDAV] Found ${objectUrls.length} calendar objects`)
@@ -83,10 +80,10 @@ export class CalDAVClient {
           const jcal = ICAL.parse(icsData)
           const comp = new ICAL.Component(jcal)
           
-          // Get all VEVENT subcomponents manually
-          const vevents: ICAL.Component[] = []
-          const nested = comp.components || []
-          for (const subcomp of nested) {
+          // Get all VEVENT subcomponents by iterating
+          const vevents: any[] = []
+          const components = (comp as any).components || []
+          for (const subcomp of components) {
             if (subcomp.name === 'VEVENT') {
               vevents.push(subcomp)
             }
@@ -96,7 +93,7 @@ export class CalDAVClient {
 
           for (const vevent of vevents) {
             try {
-              const event = this.parseEvent(vevent)
+              const event = this.parseEvent(vevent as ICAL.Component)
               events.push(event)
               console.log(`[CalDAV] Parsed event: ${event.title}`)
             } catch (eventErr) {
@@ -248,7 +245,6 @@ export class CalDAVClient {
         while ((match = hrefRegex.exec(res.body)) !== null) {
           const href = match[1]
           if (!href.endsWith('/') && href.endsWith('.ics')) {
-            // Normalise relative hrefs to absolute if needed
             const full = href.startsWith('http') ? href : new URL(href, calendarUrl).toString()
             urls.push(full)
           }
