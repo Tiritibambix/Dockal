@@ -22,7 +22,7 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { CalendarEvent } from './types'
 import EventModal from './components/EventModal.vue'
 import { APIClient } from './api/client'
@@ -42,12 +42,23 @@ const calendarOptions = ref({
   weekends: true,
   select: handleDateSelect,
   eventClick: handleEventClick,
-  eventsSet: handleEvents
+  events: fetchEvents,
+  eventDrop: handleEventDrop,
+  eventResize: handleEventResize
 })
 
 const showEventModal = ref(false)
 const currentEvent = ref<CalendarEvent | null>(null)
 const apiClient = new APIClient(localStorage.getItem('token') || undefined)
+
+async function fetchEvents(info, successCallback, failureCallback) {
+  try {
+    const events = await apiClient.getEvents(info.start, info.end)
+    successCallback(events)
+  } catch (error) {
+    failureCallback(error)
+  }
+}
 
 function handleDateSelect(selectInfo) {
   currentEvent.value = {
@@ -66,8 +77,18 @@ function handleEventClick(clickInfo) {
   showEventModal.value = true
 }
 
-function handleEvents(events) {
-  // Handle events
+async function handleEventDrop(info) {
+  const event = info.event.extendedProps as CalendarEvent
+  event.start = info.event.start
+  event.end = info.event.end
+  await saveEvent(event)
+}
+
+async function handleEventResize(info) {
+  const event = info.event.extendedProps as CalendarEvent
+  event.start = info.event.start
+  event.end = info.event.end
+  await saveEvent(event)
 }
 
 async function saveEvent(event: CalendarEvent) {
@@ -85,6 +106,10 @@ async function deleteEvent(uid: string) {
 async function copyEvent(uid: string, dates: Date[]) {
   await apiClient.copyEvent(uid, { dates: dates.map(d => d.toISOString()) })
 }
+
+onMounted(() => {
+  // Additional initialization if needed
+})
 </script>
 
 <style scoped>
