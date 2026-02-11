@@ -9,7 +9,7 @@ import { calendarsRoutes } from './routes/calendars.js'
 
 const {
   RADICALE_URL = 'http://radicale:5232',
-  RADICALE_USERNAME = 'user',
+  RADICALE_USERNAME = 'admin',
   RADICALE_PASSWORD = 'password',
   JWT_SECRET = 'dev-secret-key',
   PORT = '3000',
@@ -18,15 +18,14 @@ const {
 
 const fastify: FastifyInstance = Fastify({ logger: true })
 
-// Register CORS FIRST, before other plugins
-fastify.register(fastifyCors, {
-  origin: true, // Allow all origins in development, or specify: FRONTEND_URL
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+// Register CORS with permissive settings for development
+await fastify.register(fastifyCors, {
+  origin: '*',
+  credentials: false,
 })
 
-// JWT authentication plugin
-fastify.register(fastifyJwt, { secret: JWT_SECRET })
+// Register JWT
+await fastify.register(fastifyJwt, { secret: JWT_SECRET })
 
 // Decorator for routes to use
 fastify.decorate('authenticate', async function (request: any, reply: any) {
@@ -44,13 +43,12 @@ const caldavClient = new CalDAVClient(
 )
 
 // Routes
-fastify.register((f: FastifyInstance) => authRoutes(f))
-fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
-fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
+await fastify.register((f: FastifyInstance) => authRoutes(f))
+await fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
+await fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
 
-// Health check (no auth required)
+// Health check
 fastify.get('/health', async (request, reply) => {
-  fastify.log.info('[GET /health] Health check')
   return reply.send({ status: 'ok' })
 })
 
@@ -59,7 +57,6 @@ const start = async () => {
   try {
     await caldavClient.initialize()
     fastify.log.info('CalDAV client initialized')
-
     await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' })
     fastify.log.info(`Backend running at http://0.0.0.0:${PORT}`)
   } catch (err) {
