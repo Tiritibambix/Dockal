@@ -35,6 +35,7 @@ export class CalDAVClient {
       }
       
       console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName}`)
+      console.log(`[CalDAV] Calendar has ${(this.calendar.objects || []).length} objects`)
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
@@ -55,23 +56,37 @@ export class CalDAVClient {
       
       const events: CalendarEvent[] = []
       const objects = this.calendar.objects || []
+      
+      console.log(`[CalDAV] Processing ${objects.length} calendar objects`)
 
-      for (const obj of objects) {
+      for (let i = 0; i < objects.length; i++) {
+        const obj = objects[i]
         try {
-          if (obj.data) {
-            // Parse ICS data safely
-            const icsText = typeof obj.data === 'string' ? obj.data : obj.data.toString()
-            const jcal = ICAL.parse(icsText)
-            const comp = new ICAL.Component(jcal)
-            const vevent = comp.getFirstSubcomponent('VEVENT')
+          // Extract ICS data from DAV object
+          let icsData = this.extractICSData(obj)
+          
+          if (!icsData) {
+            console.warn(`[CalDAV] Object ${i} has no data`)
+            continue
+          }
 
-            if (vevent) {
-              events.push(this.parseEvent(vevent))
-            }
+          console.log(`[CalDAV] Parsing object ${i}: ${icsData.substring(0, 100)}...`)
+          
+          const jcal = ICAL.parse(icsData)
+          const comp = new ICAL.Component(jcal)
+          const vevent = comp.getFirstSubcomponent('VEVENT')
+
+          if (vevent) {
+            const event = this.parseEvent(vevent)
+            events.push(event)
+            console.log(`[CalDAV] Parsed event: ${event.title} (${event.uid})`)
           }
         } catch (parseErr) {
-          console.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
-          console.warn(`[CalDAV] Event data: ${obj.data ? obj.data.substring(0, 200) : 'empty'}`)
+          console.warn(`[CalDAV] Failed to parse object ${i}: ${String(parseErr)}`)
+          if (obj.data) {
+            const dataStr = typeof obj.data === 'string' ? obj.data : JSON.stringify(obj.data)
+            console.warn(`[CalDAV] Data: ${dataStr.substring(0, 200)}`)
+          }
           continue
         }
       }
@@ -92,15 +107,16 @@ export class CalDAVClient {
 
       for (const obj of objects) {
         try {
-          if (obj.data) {
-            const icsText = typeof obj.data === 'string' ? obj.data : obj.data.toString()
-            const jcal = ICAL.parse(icsText)
-            const comp = new ICAL.Component(jcal)
-            const vevent = comp.getFirstSubcomponent('VEVENT')
-            
-            if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
-              return this.parseEvent(vevent)
-            }
+          const icsData = this.extractICSData(obj)
+          
+          if (!icsData) continue
+
+          const jcal = ICAL.parse(icsData)
+          const comp = new ICAL.Component(jcal)
+          const vevent = comp.getFirstSubcomponent('VEVENT')
+          
+          if (vevent && vevent.getFirstPropertyValue('uid') === uid) {
+            return this.parseEvent(vevent)
           }
         } catch (parseErr) {
           continue
@@ -159,6 +175,31 @@ export class CalDAVClient {
     } catch (err) {
       throw new Error(`Failed to delete event: ${String(err)}`)
     }
+  }
+
+  private extractICSData(obj: any): string | null {
+    // obj.data peut être dans plusieurs formats
+    if (typeof obj.data === 'string') {
+      return obj.data
+    }
+    
+    if (obj.data && typeof obj.data === 'object') {
+      // Si c'est un objet, chercher la propriété qui contient le texte
+      if (obj.data.toString && obj.data.toString() !== '[object Object]') {
+        return obj.data.toString()
+      }
+      // Chercher une propriété 'text' ou 'content'
+      if (typeof obj.data.text === 'string') return obj.data.text
+      if (typeof obj.data.content === 'string') return obj.data.content
+      if (typeof obj.data.value === 'string') return obj.data.value
+    }
+    
+    // Essayer d'accéder directement à obj pour les cas où data = l'objet lui-même
+    if (typeof obj === 'string') {
+      return obj
+    }
+    
+    return null
   }
 
   private parseEvent(vevent: ICAL.Component): CalendarEvent {
