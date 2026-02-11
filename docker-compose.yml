@@ -8,7 +8,7 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://localhost:3002
+      - VITE_API_URL=http://<HOST_IP>:3002
     networks:
       - dockal
 
@@ -20,11 +20,11 @@ services:
       - radicale
     environment:
       - RADICALE_URL=http://radicale:5232
-      - RADICALE_USERNAME=admin
-      - RADICALE_PASSWORD=password
-      - JWT_SECRET=your-secret-key-in-prod
+      - RADICALE_USERNAME=<RADICALE_USERNAME>
+      - RADICALE_PASSWORD=<RADICALE_PASSWORD>
+      - JWT_SECRET=<JWT_SECRET_KEY>
       - NODE_ENV=production
-      - FRONTEND_URL=http://localhost:5182
+      - FRONTEND_URL=http://<HOST_IP>:5182
     networks:
       - dockal
 
@@ -33,15 +33,15 @@ services:
     ports:
       - "5232:5232"
     volumes:
-      - radicale_data:/data
+      - <LOCAL_DATA_PATH>/radicale_data:/data
     environment:
       - RADICALE_STORAGE_FILESYSTEM_FOLDER=/data
     networks:
       - dockal
 
-volumes:
-  radicale_data:
-
 networks:
   dockal:
     driver: bridge
+
+volumes:
+  radicale_data:
