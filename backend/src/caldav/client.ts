@@ -82,7 +82,15 @@ export class CalDAVClient {
           
           const jcal = ICAL.parse(icsData)
           const comp = new ICAL.Component(jcal)
-          const vevents = comp.getAllSubcomponents('VEVENT')
+          
+          // Get all VEVENT subcomponents manually
+          const vevents: ICAL.Component[] = []
+          const nested = comp.components || []
+          for (const subcomp of nested) {
+            if (subcomp.name === 'VEVENT') {
+              vevents.push(subcomp)
+            }
+          }
 
           console.log(`[CalDAV] Object ${i} contains ${vevents.length} VEVENT(s)`)
 
