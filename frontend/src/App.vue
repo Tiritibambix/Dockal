@@ -29,7 +29,7 @@ import { APIClient } from './api/client'
 
 const showEventModal = ref(false)
 const currentEvent = ref<CalendarEvent | null>(null)
-const apiClient = new APIClient(localStorage.getItem('token') || undefined)
+let apiClient = new APIClient(localStorage.getItem('token') || undefined)
 
 const calendarOptions = reactive({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -176,8 +176,30 @@ function transformEventData(eventData) {
   }
 }
 
-onMounted(() => {
-  console.log('App mounted')
+onMounted(async () => {
+  console.log('[App] Mounted, initializing API client')
+  
+  // Try to get token from localStorage
+  let token = localStorage.getItem('token')
+  
+  // If no token, try to login with default credentials
+  if (!token) {
+    try {
+      console.log('[App] No token found, attempting login with default credentials')
+      const tempClient = new APIClient()
+      const result = await tempClient.login('user', 'password')
+      token = result.token
+      localStorage.setItem('token', result.token)
+      console.log('[App] Login successful, token stored')
+    } catch (err) {
+      console.error('[App] Login failed:', err)
+      alert('Failed to authenticate. Please check backend is running on port 3000.')
+      return
+    }
+  }
+  
+  apiClient = new APIClient(token)
+  console.log('[App] API client initialized with token')
 })
 </script>
 
