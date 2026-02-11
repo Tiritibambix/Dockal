@@ -44,7 +44,9 @@ const calendarOptions = ref({
   eventClick: handleEventClick,
   events: fetchEvents,
   eventDrop: handleEventDrop,
-  eventResize: handleEventResize
+  eventResize: handleEventResize,
+  dateClick: handleDateClick,
+  eventContent: renderEventContent
 })
 
 const showEventModal = ref(false)
@@ -105,6 +107,28 @@ async function deleteEvent(uid: string) {
 
 async function copyEvent(uid: string, dates: Date[]) {
   await apiClient.copyEvent(uid, { dates: dates.map(d => d.toISOString()) })
+}
+
+function handleDateClick(arg) {
+  currentEvent.value = {
+    uid: '',
+    title: '',
+    start: arg.date,
+    end: arg.date,
+    allDay: true,
+    timezone: 'UTC'
+  }
+  showEventModal.value = true
+}
+
+function renderEventContent(arg) {
+  return {
+    html: `<div class="fc-event-main-frame">
+      <div class="fc-event-title-container">
+        <div class="fc-event-title fc-sticky">${arg.event.title}</div>
+      </div>
+    </div>`
+  }
 }
 
 onMounted(() => {
