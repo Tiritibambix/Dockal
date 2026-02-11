@@ -15,6 +15,9 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { ref } from 'vue'
+import { CalendarEvent } from './types'
+import EventModal from './components/EventModal.vue'
+import { APIClient } from './api/client'
 
 const calendarOptions = ref({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -34,16 +37,45 @@ const calendarOptions = ref({
   eventsSet: handleEvents
 })
 
+const showEventModal = ref(false)
+const currentEvent = ref<CalendarEvent | null>(null)
+const apiClient = new APIClient(localStorage.getItem('token') || undefined)
+
 function handleDateSelect(selectInfo) {
-  // Handle date selection
+  currentEvent.value = {
+    uid: '',
+    title: '',
+    start: selectInfo.start,
+    end: selectInfo.end,
+    allDay: selectInfo.allDay,
+    timezone: 'UTC'
+  }
+  showEventModal.value = true
 }
 
 function handleEventClick(clickInfo) {
-  // Handle event click
+  currentEvent.value = clickInfo.event.extendedProps as CalendarEvent
+  showEventModal.value = true
 }
 
 function handleEvents(events) {
   // Handle events
+}
+
+async function saveEvent(event: CalendarEvent) {
+  if (event.uid) {
+    await apiClient.updateEvent(event)
+  } else {
+    await apiClient.createEvent(event)
+  }
+}
+
+async function deleteEvent(uid: string) {
+  await apiClient.deleteEvent(uid)
+}
+
+async function copyEvent(uid: string, dates: Date[]) {
+  await apiClient.copyEvent(uid, { dates: dates.map(d => d.toISOString()) })
 }
 </script>
 
