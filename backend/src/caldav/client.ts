@@ -1,5 +1,6 @@
 import * as DAV from 'dav'
 import ICAL from 'ical.js'
+import { v4 as uuidv4 } from 'uuid'
 import { CalendarEvent } from '../types.js'
 
 export class CalDAVClient {
@@ -58,20 +59,19 @@ export class CalDAVClient {
       for (const obj of objects) {
         try {
           if (obj.data) {
-            const jcal = ICAL.parse(obj.data)
+            // Parse ICS data safely
+            const icsText = typeof obj.data === 'string' ? obj.data : obj.data.toString()
+            const jcal = ICAL.parse(icsText)
             const comp = new ICAL.Component(jcal)
             const vevent = comp.getFirstSubcomponent('VEVENT')
 
             if (vevent) {
-              const event = this.parseEvent(vevent)
-              // Filter by date range if needed
-              if (event.start >= from && event.start <= to) {
-                events.push(event)
-              }
+              events.push(this.parseEvent(vevent))
             }
           }
         } catch (parseErr) {
           console.warn(`[CalDAV] Failed to parse event: ${String(parseErr)}`)
+          console.warn(`[CalDAV] Event data: ${obj.data ? obj.data.substring(0, 200) : 'empty'}`)
           continue
         }
       }
@@ -93,7 +93,8 @@ export class CalDAVClient {
       for (const obj of objects) {
         try {
           if (obj.data) {
-            const jcal = ICAL.parse(obj.data)
+            const icsText = typeof obj.data === 'string' ? obj.data : obj.data.toString()
+            const jcal = ICAL.parse(icsText)
             const comp = new ICAL.Component(jcal)
             const vevent = comp.getFirstSubcomponent('VEVENT')
             
