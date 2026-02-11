@@ -4,23 +4,23 @@ services:
   frontend:
     image: tiritibambix/dockal-frontend:latest
     ports:
-      - "5182:80"          # host 5182 -> container 80 (changed from 5173)
+      - "5182:80"
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=http://backend:3000
+      - VITE_API_URL=http://localhost:3002
     networks:
       - dockal
 
   backend:
     image: tiritibambix/dockal-backend:latest
     ports:
-      - "3002:3000"        # host 3002 -> container 3000 (avoid host 3000)
+      - "3002:3000"
     depends_on:
       - radicale
     environment:
       - RADICALE_URL=http://radicale:5232
-      - RADICALE_USERNAME=user
+      - RADICALE_USERNAME=admin
       - RADICALE_PASSWORD=password
       - JWT_SECRET=your-secret-key-in-prod
       - NODE_ENV=production
