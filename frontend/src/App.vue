@@ -5,6 +5,14 @@
     </header>
     <main class="p-4">
       <FullCalendar :options='calendarOptions'/>
+      <EventModal
+        :isOpen="showEventModal"
+        :event="currentEvent"
+        @save="saveEvent"
+        @delete="deleteEvent"
+        @cancel="showEventModal = false"
+        @copy="copyEvent"
+      />
     </main>
   </div>
 </template>
