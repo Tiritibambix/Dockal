@@ -46,7 +46,8 @@ const calendarOptions = ref({
   eventDrop: handleEventDrop,
   eventResize: handleEventResize,
   dateClick: handleDateClick,
-  eventContent: renderEventContent
+  eventContent: renderEventContent,
+  eventDataTransform: transformEventData
 })
 
 const showEventModal = ref(false)
@@ -128,6 +129,18 @@ function renderEventContent(arg) {
         <div class="fc-event-title fc-sticky">${arg.event.title}</div>
       </div>
     </div>`
+  }
+}
+
+function transformEventData(eventData) {
+  return {
+    ...eventData,
+    id: eventData.uid,
+    title: eventData.title,
+    start: eventData.start,
+    end: eventData.end,
+    allDay: eventData.allDay,
+    extendedProps: eventData
   }
 }
 
