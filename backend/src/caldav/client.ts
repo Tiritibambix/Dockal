@@ -25,7 +25,7 @@ export class CalDAVClient {
         xhr: this.xhr,
         accountType: 'caldav',
         loadCollections: true,
-        loadObjects: false, // Don't load objects yet, we'll fetch them manually
+        loadObjects: false,
       })
 
       const calendars = this.account.calendars || []
@@ -35,7 +35,7 @@ export class CalDAVClient {
         throw new Error('No calendar found')
       }
       
-      console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName}`)
+      console.log(`[CalDAV] Initialized with calendar: ${this.calendar.displayName} (${this.calendar.url})`)
     } catch (err) {
       throw new Error(`CalDAV initialization failed: ${String(err)}`)
     }
@@ -56,25 +56,22 @@ export class CalDAVClient {
       
       const events: CalendarEvent[] = []
       
-      // Fetch calendar objects (just metadata)
-      const objects = await DAV.fetchCalendarObjects({
-        calendar: this.calendar,
-      })
+      // Get list of calendar object URLs
+      const objectUrls = await this.listCalendarObjectUrls()
       
-      console.log(`[CalDAV] Found ${objects.length} calendar objects`)
+      console.log(`[CalDAV] Found ${objectUrls.length} calendar objects`)
 
-      for (let i = 0; i < objects.length; i++) {
-        const obj = objects[i]
+      for (let i = 0; i < objectUrls.length; i++) {
+        const url = objectUrls[i]
         try {
-          // Fetch the actual ICS data for this object
-          const icsData = await this.fetchCalendarObjectData(obj.url)
+          const icsData = await this.fetchCalendarObjectData(url)
           
           if (!icsData) {
-            console.warn(`[CalDAV] Object ${i} (${obj.url}) has no data`)
+            console.warn(`[CalDAV] Object ${i} (${url}) has no data`)
             continue
           }
 
-          console.log(`[CalDAV] Parsing object ${i} (${obj.url})`)
+          console.log(`[CalDAV] Parsing object ${i}`)
           
           const jcal = ICAL.parse(icsData)
           const comp = new ICAL.Component(jcal)
@@ -103,13 +100,11 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      const objects = await DAV.fetchCalendarObjects({
-        calendar: this.calendar,
-      })
+      const objectUrls = await this.listCalendarObjectUrls()
 
-      for (const obj of objects) {
+      for (const url of objectUrls) {
         try {
-          const icsData = await this.fetchCalendarObjectData(obj.url)
+          const icsData = await this.fetchCalendarObjectData(url)
           
           if (!icsData) continue
 
@@ -176,6 +171,50 @@ export class CalDAVClient {
       console.log(`[CalDAV] Event deleted: ${uid}`)
     } catch (err) {
       throw new Error(`Failed to delete event: ${String(err)}`)
+    }
+  }
+
+  private async listCalendarObjectUrls(): Promise<string[]> {
+    try {
+      const urls: string[] = []
+      const calendarUrl = this.calendar.url
+      
+      console.log(`[CalDAV] Listing objects from ${calendarUrl}`)
+      
+      const response = await this.xhr.request({
+        url: calendarUrl,
+        method: 'PROPFIND',
+        headers: {
+          'Depth': '1',
+          'Content-Type': 'application/xml',
+        },
+        data: `<?xml version="1.0" encoding="utf-8" ?>
+<propfind xmlns="DAV:">
+  <prop>
+    <resourcetype/>
+  </prop>
+</propfind>`,
+      })
+
+      // Parse response to extract href values
+      if (response.status === 207 && response.body) {
+        const body = response.body
+        const hrefRegex = /<href>(.*?)<\/href>/g
+        let match
+        while ((match = hrefRegex.exec(body)) !== null) {
+          const href = match[1]
+          // Skip the parent collection URL, only get .ics files
+          if (href !== calendarUrl && href.endsWith('.ics')) {
+            urls.push(href)
+          }
+        }
+      }
+      
+      console.log(`[CalDAV] Found ${urls.length} .ics files`)
+      return urls
+    } catch (err) {
+      console.error(`[CalDAV] Error listing calendar objects: ${String(err)}`)
+      return []
     }
   }
 
