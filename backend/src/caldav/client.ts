@@ -5,6 +5,7 @@ import { CalendarEvent } from '../types.js'
 export class CalDAVClient {
   private account: any
   private calendar: any
+  private xhr: any
 
   constructor(
     private radicaleUrl: string,
@@ -16,17 +17,23 @@ export class CalDAVClient {
     try {
       console.log('[CalDAV] Initializing client')
       const creds = new DAV.Credentials({ username: this.username, password: this.password })
-      const xhr = new DAV.transport.Basic(creds)
+      this.xhr = new DAV.transport.Basic(creds)
 
       this.account = await DAV.createAccount({
         server: this.radicaleUrl,
-        xhr,
+        xhr: this.xhr,
         accountType: 'caldav',
         loadCollections: true,
         loadObjects: false,
       })
 
-      // Get the default calendar
+      // Sync account to get calendars
+      await DAV.syncCaldavAccount({
+        account: this.account,
+        loadCollections: true,
+        loadObjects: false,
+      })
+
       const calendars = this.account.calendars || []
       this.calendar = calendars[0]
       
@@ -53,12 +60,15 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting events from ${from} to ${to}`)
       
-      const objects = await DAV.syncCalendar({
-        calendar: this.calendar,
+      // Sync calendar to load objects
+      await DAV.syncCaldavAccount({
+        account: this.account,
+        loadCollections: true,
         loadObjects: true,
       })
 
       const events: CalendarEvent[] = []
+      const objects = this.calendar.objects || []
 
       for (const obj of objects) {
         try {
@@ -89,10 +99,14 @@ export class CalDAVClient {
     try {
       console.log(`[CalDAV] Getting event by UID: ${uid}`)
       
-      const objects = await DAV.syncCalendar({
-        calendar: this.calendar,
+      // Sync to get all objects
+      await DAV.syncCaldavAccount({
+        account: this.account,
+        loadCollections: true,
         loadObjects: true,
       })
+
+      const objects = this.calendar.objects || []
 
       for (const obj of objects) {
         try {
