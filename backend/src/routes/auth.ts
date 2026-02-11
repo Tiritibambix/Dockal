@@ -11,12 +11,15 @@ export async function authRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing credentials' })
       }
 
+      fastify.log.info(`[POST /auth/login] Login attempt for user: ${username}`)
+
       // In production, validate against Radicale or a separate user DB
       const token = fastify.jwt.sign(
         { username },
         { expiresIn: '7d' }
       )
 
+      fastify.log.info(`[POST /auth/login] Login successful`)
       return reply.send({ token, username })
     }
   )

@@ -23,7 +23,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
         fastify.log.info(`[GET /events] Found ${events.length} events`)
         return reply.send({ events })
       } catch (err) {
-        fastify.log.error('[GET /events] Error:', err)
+        fastify.log.error(`[GET /events] Error: ${String(err)}`)
         return reply.status(500).send({ error: 'Failed to fetch events', details: String(err) })
       }
     }
@@ -35,7 +35,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
     { onRequest: [fastify.authenticate] },
     async (request: FastifyRequest<{ Body: Omit<CalendarEvent, 'uid'> }>, reply: FastifyReply) => {
       try {
-        fastify.log.info('[POST /events] Creating event:', request.body)
+        fastify.log.info(`[POST /events] Creating event: ${JSON.stringify(request.body)}`)
         
         const body = request.body
         const newEvent: CalendarEvent = {
@@ -49,12 +49,12 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
           timezone: body.timezone || 'UTC',
         }
 
-        fastify.log.info('[POST /events] Generated event:', newEvent)
+        fastify.log.info(`[POST /events] Generated event: ${JSON.stringify(newEvent)}`)
         await caldavClient.createEvent(newEvent)
-        fastify.log.info('[POST /events] Event created successfully')
+        fastify.log.info(`[POST /events] Event created successfully`)
         return reply.code(201).send(newEvent)
       } catch (err) {
-        fastify.log.error('[POST /events] Error:', err)
+        fastify.log.error(`[POST /events] Error: ${String(err)}`)
         return reply.status(500).send({ error: 'Failed to create event', details: String(err) })
       }
     }
@@ -66,7 +66,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
     { onRequest: [fastify.authenticate] },
     async (request: FastifyRequest<{ Params: { id: string }; Body: CalendarEvent }>, reply: FastifyReply) => {
       try {
-        fastify.log.info(`[PUT /events/:id] Updating event ${request.params.id}:`, request.body)
+        fastify.log.info(`[PUT /events/:id] Updating event ${request.params.id}: ${JSON.stringify(request.body)}`)
         
         const id = request.params.id
         const body = request.body
@@ -85,7 +85,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
         fastify.log.info(`[PUT /events/:id] Event ${id} updated successfully`)
         return reply.send(event)
       } catch (err) {
-        fastify.log.error(`[PUT /events/:id] Error:`, err)
+        fastify.log.error(`[PUT /events/:id] Error: ${String(err)}`)
         return reply.status(500).send({ error: 'Failed to update event', details: String(err) })
       }
     }
@@ -104,7 +104,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
         fastify.log.info(`[DELETE /events/:id] Event ${id} deleted successfully`)
         return reply.send({ success: true })
       } catch (err) {
-        fastify.log.error(`[DELETE /events/:id] Error:`, err)
+        fastify.log.error(`[DELETE /events/:id] Error: ${String(err)}`)
         return reply.status(500).send({ error: 'Failed to delete event', details: String(err) })
       }
     }
@@ -116,7 +116,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
     { onRequest: [fastify.authenticate] },
     async (request: FastifyRequest<{ Params: { uid: string }; Body: CopyEventPayload }>, reply: FastifyReply) => {
       try {
-        fastify.log.info(`[POST /events/:uid/copy] Copying event ${request.params.uid}:`, request.body)
+        fastify.log.info(`[POST /events/:uid/copy] Copying event ${request.params.uid}: ${JSON.stringify(request.body)}`)
         
         const sourceEvent = await caldavClient.getEventByUid(request.params.uid)
         if (!sourceEvent) {
@@ -145,7 +145,7 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
         fastify.log.info(`[POST /events/:uid/copy] Event copied to ${copiedEvents.length} dates`)
         return reply.status(201).send({ copiedEvents, sourceUid: sourceEvent.uid })
       } catch (err) {
-        fastify.log.error('[POST /events/:uid/copy] Error:', err)
+        fastify.log.error(`[POST /events/:uid/copy] Error: ${String(err)}`)
         return reply.status(500).send({ error: 'Failed to copy event', details: String(err) })
       }
     }
@@ -156,24 +156,27 @@ export function eventsRoutes(fastify: FastifyInstance, caldavClient: CalDAVClien
     '/events/:id',
     { onRequest: [fastify.authenticate] },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = request.params.id as string
+      const id = request.params.id
       try {
         const ev = await caldavClient.getEventByUid(id)
         if (!ev) return reply.status(404).send({ error: 'Event not found' })
         return reply.send(ev)
       } catch (err) {
-        fastify.log.error(err)
-        return reply.status(500).send({ error: 'Failed to fetch event' })
+        fastify.log.error(`[GET /events/:id] Error: ${String(err)}`)
+        return reply.status(500).send({ error: 'Failed to fetch event', details: String(err) })
       }
     }
   )
 }
 
+/**
+ * Copy event to a new date, preserving duration and timezone.
+ * NEVER copy RRULE.
+ */
 function copyEventToDate(source: CalendarEvent, targetDate: Date): CalendarEvent {
   const duration = source.end.getTime() - source.start.getTime()
   const sourceStart = new Date(source.start)
 
-  // Adjust target date to same time of day as source
   targetDate.setHours(
     sourceStart.getHours(),
     sourceStart.getMinutes(),
@@ -193,6 +196,5 @@ function copyEventToDate(source: CalendarEvent, targetDate: Date): CalendarEvent
     end: newEnd,
     allDay: source.allDay,
     timezone: source.timezone,
-    // NEVER copy rrule
   }
 }

@@ -41,13 +41,14 @@ const caldavClient = new CalDAVClient(
   RADICALE_PASSWORD
 )
 
-// Routes (WITHOUT global preHandler)
+// Routes
 fastify.register((f: FastifyInstance) => authRoutes(f))
 fastify.register((f: FastifyInstance) => eventsRoutes(f, caldavClient))
 fastify.register((f: FastifyInstance) => calendarsRoutes(f, caldavClient))
 
 // Health check (no auth required)
 fastify.get('/health', async (request, reply) => {
+  fastify.log.info('[GET /health] Health check')
   return reply.send({ status: 'ok' })
 })
 
@@ -60,7 +61,7 @@ const start = async () => {
     await fastify.listen({ port: parseInt(PORT), host: '0.0.0.0' })
     fastify.log.info(`Backend running at http://0.0.0.0:${PORT}`)
   } catch (err) {
-    fastify.log.error(err)
+    fastify.log.error(`Startup error: ${String(err)}`)
     process.exit(1)
   }
 }
