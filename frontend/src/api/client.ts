@@ -22,9 +22,12 @@ export class APIClient {
       },
       (error) => {
         if (error.response) {
-          console.log(`[API] Response error: `, error.response.data)
+          console.error(`[API] Response error: `, error.response.data)
+          console.error(`[API] Status: `, error.response.status)
+          console.error(`[API] Headers: `, error.response.headers)
         } else {
-          console.log(`[API] Response error: ${error.message}`)
+          console.error(`[API] Error: ${error.message}`)
+          console.error(`[API] Stack: ${error.stack}`)
         }
         return Promise.reject(error)
       }
